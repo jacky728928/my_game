@@ -1,0 +1,9 @@
+---
+description: 
+alwaysApply: true
+enabled: true
+updatedAt: 2026-06-13T10:46:37.986Z
+provider: 
+---
+
+每次对话查询.codebuddy中的开发文件（如果没有就创建），确保指导怎么改，在哪里改，代码在哪里。每次完成项目修改，文件创建后要及时更新和压缩开发文件
