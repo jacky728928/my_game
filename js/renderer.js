@@ -16,16 +16,28 @@ class Renderer {
     this.h = window.innerHeight;
   }
 
-  render(player, enemies, bullets) {
+  render(player, enemies, bullets, xpOrbs, damageNumbers) {
     const ctx = this.ctx;
     const camX = player.x;
     const camY = player.y;
-    const cx = this.w / 2;  // 屏幕中心
+    const cx = this.w / 2;
     const cy = this.h / 2;
+
+    // 视野缩放（视野+5%时，canvas放大5%，中央区域不变）
+    const vrMult = player.viewRangeMultiplier || 1;
+    const savedScale = vrMult !== 1;
 
     // 背景
     ctx.fillStyle = COLOR_BG;
     ctx.fillRect(0, 0, this.w, this.h);
+
+    // 视野缩放：以屏幕中心为基准缩放世界内容
+    if (savedScale) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(vrMult, vrMult);
+      ctx.translate(-cx, -cy);
+    }
 
     // 网格
     const gridSize = 80;
@@ -57,8 +69,17 @@ class Renderer {
     ctx.strokeStyle = COLOR_RANGE;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(cx, cy, PISTOL_RANGE, 0, Math.PI * 2);
+    ctx.arc(cx, cy, player.effectiveAttackRange, 0, Math.PI * 2);
     ctx.stroke();
+
+    // 经验吸取范围
+    ctx.strokeStyle = 'rgba(241,196,15,0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, player.effectivePickupRange, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
 
     // 子弹
     for (let b of bullets) {
@@ -73,6 +94,28 @@ class Renderer {
       ctx.arc(bx, by, b.radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
+    }
+
+    // 经验球
+    const now = performance.now() / 1000;
+    for (let orb of xpOrbs) {
+      if (!orb.alive) continue;
+      const ox = orb.x - camX + cx;
+      const oy = orb.y - camY + cy + Math.sin(now * 3 + orb.bobPhase) * 3;
+      if (ox < -20 || ox > this.w + 20 || oy < -20 || oy > this.h + 20) continue;
+      // 光晕
+      ctx.fillStyle = orb.color + '66';
+      ctx.beginPath();
+      ctx.arc(ox, oy, orb.radius + 4, 0, Math.PI * 2);
+      ctx.fill();
+      // 本体
+      ctx.fillStyle = orb.color;
+      ctx.beginPath();
+      ctx.arc(ox, oy, orb.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
     }
 
     // 敌人
@@ -105,6 +148,34 @@ class Renderer {
       ctx.fillRect(ex - half, barY, barW * hpPct, 4);
     }
 
+    // 伤害数字
+    if (damageNumbers && damageNumbers.length > 0) {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let dn of damageNumbers) {
+        const dx = dn.x - camX + cx;
+        const dy = dn.y - camY + cy;
+        const alpha = Math.max(0, Math.min(1, dn.life / dn.maxLife));
+        if (dn.isCrit) {
+          // 暴击：红色 + 更大 + 描边
+          ctx.font = 'bold 22px Arial';
+          ctx.fillStyle = 'rgba(231,76,60,' + alpha + ')';
+          ctx.strokeStyle = 'rgba(0,0,0,' + (alpha * 0.8) + ')';
+          ctx.lineWidth = 3;
+          ctx.strokeText('CRIT ' + dn.value, dx, dy);
+          ctx.fillText('CRIT ' + dn.value, dx, dy);
+        } else {
+          // 普通：金黄色
+          ctx.font = 'bold 14px Arial';
+          ctx.fillStyle = 'rgba(255,236,150,' + alpha + ')';
+          ctx.strokeStyle = 'rgba(0,0,0,' + (alpha * 0.7) + ')';
+          ctx.lineWidth = 2;
+          ctx.strokeText(String(dn.value), dx, dy);
+          ctx.fillText(String(dn.value), dx, dy);
+        }
+      }
+    }
+
     // 玩家
     if (player.damageFlash > 0) {
       ctx.fillStyle = COLOR_DAMAGE_FLASH;
@@ -132,6 +203,29 @@ class Renderer {
                cy + Math.sin(player.angle) * (player.radius + 10));
     ctx.stroke();
 
+    // 恢复视野缩放（此后为 UI 正常大小）
+    if (savedScale) ctx.restore();
+
+    // ====== 经验条（顶部居中） ======
+    const xpBarW = 180;
+    const xpBarH = 8;
+    const xpBarX = this.w / 2 - xpBarW / 2;
+    const xpBarY = 12;
+    const xpPct = player.xpToNext > 0 ? player.xp / player.xpToNext : 1;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.fillRect(xpBarX - 1, xpBarY - 1, xpBarW + 2, xpBarH + 2);
+    ctx.strokeRect(xpBarX - 1, xpBarY - 1, xpBarW + 2, xpBarH + 2);
+    ctx.fillStyle = XP_BAR_COLOR;
+    ctx.fillRect(xpBarX, xpBarY, xpBarW * Math.min(1, xpPct), xpBarH);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('Lv' + player.level + '  XP ' + player.xp + '/' + player.xpToNext, this.w / 2, xpBarY + xpBarH + 4);
+
     // ====== 主角头上血条 ======
     const barW = 60;
     const barH = 6;
@@ -139,17 +233,14 @@ class Renderer {
     const barY = cy - player.radius - 28;
     const hpPct = Math.max(0, player.hp / player.maxHp);
 
-    // 背景
     ctx.fillStyle = COLOR_HP_BG;
     ctx.strokeStyle = 'rgba(255,255,255,0.4)';
     ctx.lineWidth = 1;
     ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
     ctx.strokeRect(barX - 1, barY - 1, barW + 2, barH + 2);
-    // 血量
     const hpColor = hpPct > 0.5 ? COLOR_HP_HIGH : hpPct > 0.25 ? COLOR_HP_MID : COLOR_HP_LOW;
     ctx.fillStyle = hpColor;
     ctx.fillRect(barX, barY, barW * hpPct, barH);
-    // 数值
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 10px Arial';
     ctx.textAlign = 'center';
@@ -160,6 +251,28 @@ class Renderer {
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('击杀: ' + (window._killCount || 0), cx, cy + player.radius + 28);
+
+    // 左上角能力状态
+    const statsX = 12;
+    const statsY = this.h - 76;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.fillRect(statsX - 4, statsY, 160, 80);
+    ctx.strokeRect(statsX - 4, statsY, 160, 80);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = '11px Arial';
+    ctx.fillStyle = '#f1c40f';
+    ctx.fillText('攻速 +' + (player.attackSpeedBonus || 0) + '%', statsX + 4, statsY + 6);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillText('暴击 ' + (player.critChance || 0) + '%  x' + (player.critMultiplier || CRIT_MULTIPLIER_BASE), statsX + 4, statsY + 22);
+    ctx.fillStyle = '#e67e22';
+    ctx.fillText('伤害 +' + (player.damageBonus || 0) + '  攻距 +' + (player.attackRangeBonus || 0), statsX + 4, statsY + 38);
+    ctx.fillStyle = '#3498db';
+    ctx.fillText('视野 +' + (player.viewRangeBonus || 0) + '%  吸距 +' + (player.pickupRangeBonus || 0), statsX + 4, statsY + 54);
+    ctx.fillStyle = '#d35400';
+    ctx.fillText('经验倍率 x' + (player.expMultiplier || 1), statsX + 4, statsY + 70);
 
     // 死亡画面
     if (!player.alive) {

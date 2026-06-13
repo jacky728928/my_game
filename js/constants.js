@@ -10,7 +10,7 @@ const PLAYER_MAX_HP = 100;
 // 武器
 const PISTOL_RANGE = 250;        // 攻击范围半径
 const PISTOL_DAMAGE = 5;
-const PISTOL_INTERVAL = 0.2;    // 攻击间隔(秒)
+const PISTOL_INTERVAL = 1.0;    // 攻击间隔(秒)
 const BULLET_SPEED = 400;
 const BULLET_RADIUS = 4;
 
@@ -45,3 +45,29 @@ const MINIMAP_SIZE = 120;
 
 // 伤害闪光持续时间
 const DAMAGE_FLASH_DURATION = 0.25;
+
+// 经验系统
+const XP_PICKUP_RANGE = 70;            // 自动拾取范围（半径）
+const XP_ORB_BASE_RADIUS = 5;
+const XP_LEVEL_BASE = 20;              // 升级所需 = 等级 × 20
+const XP_ORB_COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6'];
+const XP_BAR_COLOR = '#f1c40f';        // 经验条金色
+const XP_FLY_SPEED = 420;              // 经验球飞向角色的最大速度
+
+// 暴击系统
+const CRIT_MULTIPLIER_BASE = 1.5;      // 初始暴击倍率 150%
+
+// 能力升级选项（升级时随机三选一）
+const ABILITY_POOL = [
+  { id: 'hp_max',       name: '坚韧体魄', desc: '最大生命 +10，同时恢复 10 HP' },
+  { id: 'attack_speed',  name: '急速射击', desc: '攻速 +20%（攻击间隔缩短）' },
+  { id: 'crit_chance',  name: '致命一击', desc: '暴击概率 +10%（初始暴击倍率 150%）' },
+  { id: 'damage',        name: '强化火力', desc: '基础攻击 +2 点伤害' },
+  { id: 'view_range',    name: '鹰眼视野', desc: '视野范围 +5%（显示更大区域）' },
+  { id: 'attack_range',  name: '超距感知', desc: '攻击范围 +5 px' },
+  { id: 'pickup_range',  name: '灵力汲取', desc: '经验吸取范围 +5 px' },
+];
+
+// 伤害数字显示
+const DAMAGE_NUM_LIFE = 0.9;            // 数字存活秒数
+const DAMAGE_NUM_SPEED = 40;            // 上升速度（像素/秒）
