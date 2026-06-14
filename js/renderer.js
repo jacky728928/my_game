@@ -16,7 +16,7 @@ class Renderer {
     this.h = window.innerHeight;
   }
 
-  render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, explosions, particles, targetMarkers) {
+  render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, shells, explosions, particles, targetMarkers) {
     const ctx = this.ctx;
     const camX = player.x;
     const camY = player.y;
@@ -210,25 +210,171 @@ class Renderer {
       }
     }
 
-    // 爆炸视觉效果（扩散的圆环）
+    // 榴弹炮弹体：旋转的发光弹丸 + 拖尾光带
+    if (shells && shells.length > 0) {
+      for (let s of shells) {
+        const sx = s.x - camX + cx;
+        const sy = s.y - camY + cy;
+        if (sx < -100 || sx > this.w + 100 || sy < -100 || sy > this.h + 100) continue;
+
+        ctx.save();
+        // 外层光晕（大）
+        ctx.shadowColor = s.color || '#e67e22';
+        ctx.shadowBlur = 35;
+        ctx.fillStyle = s.color || '#e67e22';
+        ctx.beginPath();
+        ctx.arc(sx, sy, 9, 0, Math.PI * 2);
+        ctx.fill();
+        // 中间白色内核（亮）
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ffffff';
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+        ctx.fill();
+        // 方向尾翼（一条沿运动方向的光带）
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 0.7;
+        ctx.strokeStyle = '#ffee66';
+        ctx.lineWidth = 3;
+        const tailLen = 25;
+        ctx.beginPath();
+        ctx.moveTo(sx - Math.cos(s.angle) * tailLen, sy - Math.sin(s.angle) * tailLen);
+        ctx.lineTo(sx, sy);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    }
+
+    // 爆炸视觉效果（多层圆环 + 中心辐射）
     if (explosions && explosions.length > 0) {
       for (let ex of explosions) {
         const ex2 = ex.x - camX + cx;
         const ey2 = ex.y - camY + cy;
+        const t = 1 - (ex.life / ex.maxLife);
         const alpha = Math.max(0, Math.min(1, ex.life / ex.maxLife));
-        ctx.strokeStyle = ex.color || '#e67e22';
-        ctx.lineWidth = 4 * alpha + 1;
+
+        if (ex.type === 'ring_main') {
+          // 主环：粗、彩色、带外发光
+          ctx.save();
+          ctx.shadowColor = ex.color;
+          ctx.shadowBlur = 25;
+          ctx.strokeStyle = ex.color;
+          ctx.lineWidth = 5 * alpha + 2;
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          ctx.arc(ex2, ey2, ex.radius, 0, Math.PI * 2);
+          ctx.stroke();
+          // 内部淡色填充
+          ctx.globalAlpha = alpha * 0.3;
+          ctx.fillStyle = ex.color;
+          ctx.beginPath();
+          ctx.arc(ex2, ey2, ex.radius * 0.7, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        } else if (ex.type === 'ring_white') {
+          // 白色高光环：细、亮、收缩更快
+          ctx.save();
+          ctx.shadowColor = '#ffffff';
+          ctx.shadowBlur = 15;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 3 * alpha + 1;
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          ctx.arc(ex2, ey2, ex.radius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        } else if (ex.type === 'ring_outer') {
+          // 外圈扩散环：粗大、暗红橙
+          ctx.save();
+          ctx.strokeStyle = ex.color;
+          ctx.lineWidth = 3 * alpha + 1;
+          ctx.globalAlpha = alpha * 0.7;
+          ctx.beginPath();
+          ctx.arc(ex2, ey2, ex.radius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        } else {
+          // 默认兼容（简单圆环）
+          ctx.strokeStyle = ex.color;
+          ctx.lineWidth = 4 * alpha + 1;
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          ctx.arc(ex2, ey2, ex.radius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = alpha * 0.35;
+          ctx.fillStyle = ex.color;
+          ctx.beginPath();
+          ctx.arc(ex2, ey2, ex.radius * 0.8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    // 目标锁定指示器（榴弹炮瞄准时）：十字瞄准线 + 4个角标 + 收缩圆环
+    if (targetMarkers && targetMarkers.length > 0) {
+      for (let m of targetMarkers) {
+        const mx = m.x - camX + cx;
+        const my = m.y - camY + cy;
+        const progress = 1 - (m.life / m.maxLife);  // 0→1
+        const alpha = Math.max(0, m.life / m.maxLife);
+
+        ctx.save();
+        // 外圈：虚线范围圆（收缩）
+        ctx.strokeStyle = m.color || '#e67e22';
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = alpha * 0.8;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.arc(mx, my, m.radius * (1 - progress * 0.2), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 4个角标（在半径的外圈，随进度向内收拢）
+        const bracketR = m.radius * (1.1 - progress * 0.3);
+        const bracketLen = 14;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = m.color || '#e67e22';
+        ctx.globalAlpha = alpha;
+        // 左上 / 右上 / 左下 / 右下
+        const corners = [
+          [-1, -1], [1, -1], [-1, 1], [1, 1],
+        ];
+        for (let c of corners) {
+          const cx2 = mx + c[0] * bracketR;
+          const cy2 = my + c[1] * bracketR;
+          ctx.beginPath();
+          ctx.moveTo(cx2 + c[0] * bracketLen, cy2);
+          ctx.lineTo(cx2, cy2);
+          ctx.lineTo(cx2, cy2 + c[1] * bracketLen);
+          ctx.stroke();
+        }
+
+        // 中心十字瞄准线（短十字）
+        const crossLen = 18;
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.beginPath();
+        ctx.moveTo(mx - crossLen, my);
+        ctx.lineTo(mx - 6, my);
+        ctx.moveTo(mx + 6, my);
+        ctx.lineTo(mx + crossLen, my);
+        ctx.moveTo(mx, my - crossLen);
+        ctx.lineTo(mx, my - 6);
+        ctx.moveTo(mx, my + 6);
+        ctx.lineTo(mx, my + crossLen);
+        ctx.stroke();
+
+        // 中心点（小圆）
+        ctx.fillStyle = m.color || '#e67e22';
         ctx.globalAlpha = alpha;
         ctx.beginPath();
-        ctx.arc(ex2, ey2, ex.radius, 0, Math.PI * 2);
-        ctx.stroke();
-        // 内部填充
-        ctx.fillStyle = ex.color || '#e67e22';
-        ctx.globalAlpha = alpha * 0.35;
-        ctx.beginPath();
-        ctx.arc(ex2, ey2, ex.radius * 0.8, 0, Math.PI * 2);
+        ctx.arc(mx, my, 3, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 1;
+        ctx.restore();
       }
     }
 

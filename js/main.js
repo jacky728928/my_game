@@ -5,6 +5,7 @@ let bullets = [];
 let xpOrbs = [];
 let damageNumbers = [];    // {x,y,value,isCrit,life}
 let grenades = [];          // 延迟爆炸：手雷飞行中的投掷物
+let shells = [];            // 榴弹炮：发射中的弹体（飞行→爆炸）
 let explosions = [];        // 爆炸视觉效果（闪光+冲击波）
 let particles = [];         // 通用粒子（爆炸碎片/烟雾/火星）
 let targetMarkers = [];     // 目标锁定指示（榴弹炮瞄准时显示）
@@ -40,6 +41,77 @@ function init() {
   gameOver = false;
   gamePaused = false;
   closeLevelUpUi();
+  // 开局先选模式（手机/电脑），手机视野+50%；选完再选副武器
+  openModeSelectUi();
+}
+
+// 开局模式选择：手机 vs 电脑
+function openModeSelectUi() {
+  gamePaused = true;
+  closeLevelUpUi();
+  const container = document.createElement('div');
+  container.id = 'levelUpUi';
+  container.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;color:#fff;user-select:none;';
+
+  const title = document.createElement('div');
+  title.textContent = '✦ 选择你的模式 ✦';
+  title.style.cssText = 'font-size:30px;font-weight:bold;margin-bottom:10px;color:#f1c40f;text-shadow:0 2px 8px rgba(0,0,0,0.6);';
+  container.appendChild(title);
+
+  const subtitle = document.createElement('div');
+  subtitle.textContent = '手机模式：视野 +50%（更适合窄屏）| 电脑模式：标准视野';
+  subtitle.style.cssText = 'font-size:13px;color:#aaa;margin-bottom:28px;text-align:center;';
+  container.appendChild(subtitle);
+
+  const cards = document.createElement('div');
+  cards.style.cssText = 'display:flex;gap:22px;flex-wrap:wrap;justify-content:center;';
+
+  // 手机模式
+  const mobileCard = document.createElement('div');
+  mobileCard.style.cssText = 'width:220px;padding:26px 20px;border:2px solid #3498db;border-radius:14px;background:rgba(26,26,46,0.85);cursor:pointer;transition:all 0.15s;text-align:center;';
+  mobileCard.onmouseenter = () => { mobileCard.style.transform = 'translateY(-3px)'; mobileCard.style.boxShadow = '0 6px 16px rgba(52,152,219,0.45)'; };
+  mobileCard.onmouseleave = () => { mobileCard.style.transform = 'translateY(0)'; mobileCard.style.boxShadow = 'none'; };
+  mobileCard.onclick = () => {
+    player.viewRangeBonus += 50;  // 手机模式：视野 +50%
+    closeLevelUpUi();
+    // 进入副武器选择
+    player.pendingLevelUps.push({ level: 1, type: 'secondary' });
+    triggerLevelUpUi();
+  };
+  const mobileName = document.createElement('div');
+  mobileName.textContent = '📱 手机模式';
+  mobileName.style.cssText = 'font-size:20px;font-weight:bold;color:#3498db;margin-bottom:10px;';
+  const mobileDesc = document.createElement('div');
+  mobileDesc.textContent = '视野 +50%\n屏幕内能看到更多区域\n适合窄屏和移动端';
+  mobileDesc.style.cssText = 'font-size:12px;color:#ddd;line-height:1.6;white-space:pre-line;';
+  mobileCard.appendChild(mobileName);
+  mobileCard.appendChild(mobileDesc);
+  cards.appendChild(mobileCard);
+
+  // 电脑模式
+  const pcCard = document.createElement('div');
+  pcCard.style.cssText = 'width:220px;padding:26px 20px;border:2px solid #9b59b6;border-radius:14px;background:rgba(26,26,46,0.85);cursor:pointer;transition:all 0.15s;text-align:center;';
+  pcCard.onmouseenter = () => { pcCard.style.transform = 'translateY(-3px)'; pcCard.style.boxShadow = '0 6px 16px rgba(155,89,182,0.45)'; };
+  pcCard.onmouseleave = () => { pcCard.style.transform = 'translateY(0)'; pcCard.style.boxShadow = 'none'; };
+  pcCard.onclick = () => {
+    closeLevelUpUi();
+    // 进入副武器选择
+    player.pendingLevelUps.push({ level: 1, type: 'secondary' });
+    triggerLevelUpUi();
+  };
+  const pcName = document.createElement('div');
+  pcName.textContent = '💻 电脑模式';
+  pcName.style.cssText = 'font-size:20px;font-weight:bold;color:#9b59b6;margin-bottom:10px;';
+  const pcDesc = document.createElement('div');
+  pcDesc.textContent = '标准视野\n适合大屏电脑操作\n原始画面比例';
+  pcDesc.style.cssText = 'font-size:12px;color:#ddd;line-height:1.6;white-space:pre-line;';
+  pcCard.appendChild(pcName);
+  pcCard.appendChild(pcDesc);
+  cards.appendChild(pcCard);
+
+  container.appendChild(cards);
+  document.body.appendChild(container);
+  levelUpUi = container;
 }
 
 // 生成悬浮伤害数字
@@ -143,86 +215,106 @@ function applyAoeDamage(x, y, radius, damage) {
   }
 }
 
-// 创建爆炸：包含多层冲击波、中心闪光、粒子碎片、烟雾
+// 创建爆炸：多层冲击波 + 中心闪光 + 碎片 + 烟雾 + 火花
 function createExplosion(x, y, radius, color, extra) {
-  const maxLife = 0.8;
+  // 主冲击波（颜色环）
   explosions.push({
     x, y,
     radius: 0,
     maxRadius: radius,
-    life: maxLife,
-    maxLife: maxLife,
+    life: 0.8,
+    maxLife: 0.8,
     color: color,
-    type: (extra && extra.type) || 'big',   // 'big'=手雷, 'medium'=榴弹炮
+    type: 'ring_main',
+  });
+  // 第二道冲击波（白色高光环，略小更快）
+  explosions.push({
+    x, y,
+    radius: 0,
+    maxRadius: radius * 0.75,
+    life: 0.5,
+    maxLife: 0.5,
+    color: '#ffffff',
+    type: 'ring_white',
+  });
+  // 第三道：外圈橙红扩散
+  explosions.push({
+    x, y,
+    radius: 0,
+    maxRadius: radius * 1.3,
+    life: 1.0,
+    maxLife: 1.0,
+    color: '#ff5522',
+    type: 'ring_outer',
   });
 
-  // 中心闪光粒子：一次性产生 24~40 片
-  const debrisCount = 32;
+  // 爆炸碎片：更多、更快、更密集
+  const debrisCount = 50;
   for (let i = 0; i < debrisCount; i++) {
-    const angle = (i / debrisCount) * Math.PI * 2 + Math.random() * 0.3;
-    const speed = (80 + Math.random() * 120) * (radius / 80);
-    const colorList = ['#ffffff', color, '#ffdd55', '#ff7722', '#d82c2c'];
+    const angle = (i / debrisCount) * Math.PI * 2 + Math.random() * 0.4;
+    const speed = (120 + Math.random() * 220) * (radius / 100);
+    const colorList = ['#ffffff', color, '#ffee66', '#ff7722', '#ff3322', '#aa2211'];
     particles.push({
       type: 'debris',
       x: x,
       y: y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      size: 2 + Math.random() * 4,
-      life: 0.5 + Math.random() * 0.4,
-      maxLife: 0.9,
+      size: 2 + Math.random() * 5,
+      life: 0.5 + Math.random() * 0.5,
+      maxLife: 1.0,
       color: colorList[Math.floor(Math.random() * colorList.length)],
-      drag: 2.8,
+      drag: 2.5,
     });
   }
 
-  // 烟雾粒子（较大、慢速、灰色/橙色、淡出）
-  const smokeCount = 14;
+  // 烟雾：多团、上升、扩大
+  const smokeCount = 22;
   for (let i = 0; i < smokeCount; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 15 + Math.random() * 35;
+    const speed = 20 + Math.random() * 50;
     particles.push({
       type: 'smoke',
-      x: x + (Math.random() - 0.5) * radius * 0.3,
-      y: y + (Math.random() - 0.5) * radius * 0.3,
+      x: x + (Math.random() - 0.5) * radius * 0.4,
+      y: y + (Math.random() - 0.5) * radius * 0.4,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 10,
-      size: 10 + Math.random() * 18,
-      life: 0.7 + Math.random() * 0.6,
-      maxLife: 1.3,
-      color: Math.random() < 0.5 ? '#555555' : '#7a4a28',
-      drag: 0.8,
-      grow: 25,        // 随时间扩大
+      vy: Math.sin(angle) * speed - 20,
+      size: 14 + Math.random() * 24,
+      life: 0.9 + Math.random() * 0.8,
+      maxLife: 1.7,
+      color: Math.random() < 0.4 ? '#3a3a3a' : (Math.random() < 0.5 ? '#555555' : '#7a4a28'),
+      drag: 0.6,
+      grow: 35,
     });
   }
 
-  // 火花（快速上升的小亮点）
-  const sparkCount = 20;
+  // 火花：大量快速小亮点，向四周喷射并上升
+  const sparkCount = 35;
   for (let i = 0; i < sparkCount; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 120 + Math.random() * 180;
+    const speed = 150 + Math.random() * 280;
     particles.push({
       type: 'spark',
       x: x,
       y: y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 40,
-      size: 1.5 + Math.random() * 2,
-      life: 0.3 + Math.random() * 0.4,
-      maxLife: 0.7,
-      color: Math.random() < 0.5 ? '#ffe066' : '#ffb347',
-      drag: 1.5,
+      vy: Math.sin(angle) * speed - 50,
+      size: 1.5 + Math.random() * 2.5,
+      life: 0.35 + Math.random() * 0.5,
+      maxLife: 0.85,
+      color: Math.random() < 0.4 ? '#ffffff' : (Math.random() < 0.5 ? '#ffee66' : '#ff8833'),
+      drag: 1.6,
     });
   }
 }
 
-// 创建目标锁定指示器（用于榴弹炮瞄准）
+// 创建目标锁定指示器（十字瞄准线 + 收缩环，飞行命中时消失）
 function createTargetMarker(x, y, radius, color) {
   targetMarkers.push({
     x, y,
     radius: radius,
-    life: 0.45,
-    maxLife: 0.45,
+    life: 0.9,
+    maxLife: 0.9,
     color: color || '#e67e22',
   });
 }
@@ -259,14 +351,34 @@ function updateSecondaryWeapons(dt) {
     }
 
     if (def.type === 'aoe_direct') {
-      // 榴弹炮：找最近敌人（搜索半径不限制），直接 AOE 命中
+      // 榴弹炮：找最近敌人 → 目标标记 → 发射弹体 → 命中后爆炸
       const target = findNearestEnemy(1e9);
       if (!target) continue;
       const dmg = baseDmg * def.damageMult;
-      // 目标锁定指示（爆炸前一瞬高亮）
-      createTargetMarker(target.enemy.x, target.enemy.y, def.aoeRadius, def.color);
-      applyAoeDamage(target.enemy.x, target.enemy.y, def.aoeRadius, dmg);
-      createExplosion(target.enemy.x, target.enemy.y, def.aoeRadius, def.color);
+      const tx = target.enemy.x;
+      const ty = target.enemy.y;
+      // 目标锁定指示（更长时间，给玩家看到"瞄准"）
+      createTargetMarker(tx, ty, def.aoeRadius, def.color);
+      // 发射弹体：从玩家飞向目标
+      const dx = tx - player.x;
+      const dy = ty - player.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const flyTime = Math.max(0.5, Math.min(2.0, dist / 300)); // 降低弹道速度，让拖尾和目标锁定更壮观
+      shells.push({
+        x: player.x,
+        y: player.y,
+        startX: player.x,
+        startY: player.y,
+        targetX: tx,
+        targetY: ty,
+        flyTime: flyTime,
+        flyElapsed: 0,
+        dmg: dmg,
+        aoeRadius: def.aoeRadius,
+        color: def.color,
+        exploded: false,
+        angle: Math.atan2(dy, dx), // 用于绘制方向
+      });
       slot.cooldown = def.cooldown;
       continue;
     }
@@ -303,6 +415,46 @@ function updateSecondaryWeapons(dt) {
       continue;
     }
   }
+
+  // 榴弹炮弹体：飞行 + 命中爆炸
+  for (let s of shells) {
+    s.flyElapsed += dt;
+    const t = Math.min(1, s.flyElapsed / s.flyTime);
+    s.x = s.startX + (s.targetX - s.startX) * t;
+    s.y = s.startY + (s.targetY - s.startY) * t;
+    // 飞行拖尾：密集的火花和发光粒子
+    if (Math.random() < 0.85) {
+      particles.push({
+        type: 'trail',
+        x: s.x + (Math.random() - 0.5) * 8,
+        y: s.y + (Math.random() - 0.5) * 8,
+        vx: (Math.random() - 0.5) * 60,
+        vy: (Math.random() - 0.5) * 60 - 10,
+        size: 4 + Math.random() * 3,
+        life: 0.25 + Math.random() * 0.2,
+        maxLife: 0.45,
+        color: Math.random() < 0.4 ? '#ffffff' : (Math.random() < 0.5 ? '#ffcc33' : '#ff6611'),
+        drag: 2.5,
+      });
+    }
+    if (t >= 1 && !s.exploded) {
+      s.exploded = true;
+      // 命中后：大爆炸 + 伤害 + 大量碎片
+      applyAoeDamage(s.x, s.y, s.aoeRadius, s.dmg);
+      createExplosion(s.x, s.y, s.aoeRadius, s.color);
+      // 额外的爆炸冲击波（让大爆炸更有层次）
+      explosions.push({
+        x: s.x, y: s.y,
+        radius: 0,
+        maxRadius: s.aoeRadius * 1.6,
+        life: 0.6,
+        maxLife: 0.6,
+        color: '#ffffff',
+        type: 'big',
+      });
+    }
+  }
+  shells = shells.filter(s => !s.exploded);
 
   // 手雷飞行与爆炸
   for (let g of grenades) {
@@ -928,7 +1080,7 @@ function gameLoop() {
   if (dt > 0.1) dt = 0.1;
 
   update(dt);
-  renderer.render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, explosions, particles, targetMarkers);
+  renderer.render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, shells, explosions, particles, targetMarkers);
   minimap.render(player, enemies, player.x, player.y);
 
   requestAnimationFrame(gameLoop);
