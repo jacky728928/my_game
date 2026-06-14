@@ -25,6 +25,8 @@ class Player {
     this.attackRangeBonus = 0;       // px，如 5 = 攻击范围 +5px
     this.pickupRangeBonus = 0;       // px，如 5 = 经验吸取范围 +5px
     this.expMultiplier = 1;           // 经验获取倍率（开发者面板可调）
+    // 副武器槽：最多 MAX_SECONDARY_WEAPONS 个
+    this.secondaryWeapons = [];       // [{ id, cooldown, ...静态参数引用 }]
     // 朝向（弧度）
     this.angle = 0;
     // 受击闪光
@@ -34,8 +36,8 @@ class Player {
     this.xp = 0;
     this.xpToNext = XP_LEVEL_BASE;
     this.alive = true;
-    // 升级挂起（用于外部检测暂停）
-    this.pendingLevelUps = 0;
+    // 升级挂起（数组，每项记录升级后得到的等级和类型）
+    this.pendingLevelUps = [];
   }
 
   // 动态属性
@@ -82,7 +84,14 @@ class Player {
       this.maxHp += 5;
       this.hp = Math.min(this.hp + 5, this.maxHp);
       this.xpToNext = this.level * XP_LEVEL_BASE;
-      this.pendingLevelUps++;
+      // 判断本等级的类型
+      const isSecondary =
+        this.level === 5 ||
+        (this.level >= 10 && this.level % 10 === 0);
+      this.pendingLevelUps.push({
+        level: this.level,
+        type: isSecondary ? 'secondary' : 'ability',
+      });
       leveled = true;
     }
     return leveled;
@@ -131,5 +140,27 @@ class Player {
       return { damage: finalDmg * this.critMultiplier, isCrit: true };
     }
     return { damage: finalDmg, isCrit: false };
+  }
+
+  // 副武器：是否已装备同名
+  hasSecondaryWeapon(id) {
+    return this.secondaryWeapons.some(w => w.id === id);
+  }
+
+  // 副武器：装备（调用方确保数量合法）
+  equipSecondaryWeapon(id) {
+    if (!SECONDARY_WEAPON_POOL[id]) return;
+    if (this.hasSecondaryWeapon(id)) return;
+    const def = SECONDARY_WEAPON_POOL[id];
+    this.secondaryWeapons.push({
+      id: def.id,
+      def: def,
+      cooldown: def.cooldown,        // 首次稍快触发一些？默认满冷却
+    });
+  }
+
+  // 副武器：丢弃
+  discardSecondaryWeapon(id) {
+    this.secondaryWeapons = this.secondaryWeapons.filter(w => w.id !== id);
   }
 }

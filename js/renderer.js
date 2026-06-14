@@ -16,7 +16,7 @@ class Renderer {
     this.h = window.innerHeight;
   }
 
-  render(player, enemies, bullets, xpOrbs, damageNumbers) {
+  render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, explosions) {
     const ctx = this.ctx;
     const camX = player.x;
     const camY = player.y;
@@ -118,6 +118,71 @@ class Renderer {
       ctx.stroke();
     }
 
+    // 手雷（飞行中）
+    if (grenades && grenades.length > 0) {
+      for (let g of grenades) {
+        const gx = g.x - camX + cx;
+        const gy = g.y - camY + cy;
+        if (gx < -50 || gx > this.w + 50 || gy < -50 || gy > this.h + 50) continue;
+        // 飞行中的手雷：红色小圆 + 闪烁
+        if (!g.landed) {
+          ctx.fillStyle = g.color || '#e74c3c';
+          ctx.shadowColor = '#fff';
+          ctx.shadowBlur = 4;
+          ctx.beginPath();
+          ctx.arc(gx, gy, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        } else {
+          // 落地后的手雷：红色闪光 + 剩余引信时间显示
+          const blink = Math.floor(now * 8) % 2 === 0 ? 1 : 0.5;
+          ctx.fillStyle = g.color || '#e74c3c';
+          ctx.globalAlpha = blink;
+          ctx.beginPath();
+          ctx.arc(gx, gy, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          // AOE 范围提示
+          ctx.strokeStyle = 'rgba(231,76,60,0.45)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.arc(gx, gy, g.aoeRadius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          // 引信倒计时数字
+          const fuseLeft = Math.max(0, g.fuseTime - g.fuseElapsed);
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 11px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(fuseLeft.toFixed(1) + 's', gx, gy - 10);
+        }
+      }
+    }
+
+    // 爆炸视觉效果（扩散的圆环）
+    if (explosions && explosions.length > 0) {
+      for (let ex of explosions) {
+        const ex2 = ex.x - camX + cx;
+        const ey2 = ex.y - camY + cy;
+        const alpha = Math.max(0, Math.min(1, ex.life / ex.maxLife));
+        ctx.strokeStyle = ex.color || '#e67e22';
+        ctx.lineWidth = 4 * alpha + 1;
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(ex2, ey2, ex.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        // 内部填充
+        ctx.fillStyle = ex.color || '#e67e22';
+        ctx.globalAlpha = alpha * 0.35;
+        ctx.beginPath();
+        ctx.arc(ex2, ey2, ex.radius * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
     // 敌人
     for (let e of enemies) {
       if (!e.alive) continue;
@@ -156,7 +221,15 @@ class Renderer {
         const dx = dn.x - camX + cx;
         const dy = dn.y - camY + cy;
         const alpha = Math.max(0, Math.min(1, dn.life / dn.maxLife));
-        if (dn.isCrit) {
+        if (dn.isHeal) {
+          // 治疗：绿色 + 大
+          ctx.font = 'bold 18px Arial';
+          ctx.fillStyle = 'rgba(46,204,113,' + alpha + ')';
+          ctx.strokeStyle = 'rgba(0,0,0,' + (alpha * 0.7) + ')';
+          ctx.lineWidth = 3;
+          ctx.strokeText('+' + dn.value, dx, dy);
+          ctx.fillText('+' + dn.value, dx, dy);
+        } else if (dn.isCrit) {
           // 暴击：红色 + 更大 + 描边
           ctx.font = 'bold 22px Arial';
           ctx.fillStyle = 'rgba(231,76,60,' + alpha + ')';
@@ -273,6 +346,66 @@ class Renderer {
     ctx.fillText('视野 +' + (player.viewRangeBonus || 0) + '%  吸距 +' + (player.pickupRangeBonus || 0), statsX + 4, statsY + 54);
     ctx.fillStyle = '#d35400';
     ctx.fillText('经验倍率 x' + (player.expMultiplier || 1), statsX + 4, statsY + 70);
+
+    // 右上角副武器槽（3 个最大槽位）
+    if (player.secondaryWeapons && player.secondaryWeapons.length > 0) {
+      const slotSize = 62;
+      const slotGap = 8;
+      const totalW = MAX_SECONDARY_WEAPONS * slotSize + (MAX_SECONDARY_WEAPONS - 1) * slotGap;
+      let slotX = this.w - totalW - 12;
+      let slotY = 12;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < MAX_SECONDARY_WEAPONS; i++) {
+        const slot = player.secondaryWeapons[i];
+        const x = slotX + i * (slotSize + slotGap);
+        // 空槽位背景
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1;
+        ctx.fillRect(x, slotY, slotSize, slotSize);
+        ctx.strokeRect(x, slotY, slotSize, slotSize);
+        if (slot && slot.def) {
+          // 有装备的槽位：彩色边框
+          ctx.strokeStyle = slot.def.color;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, slotY, slotSize, slotSize);
+          // 名称
+          ctx.fillStyle = slot.def.color;
+          ctx.font = 'bold 11px Arial';
+          ctx.fillText(slot.def.name, x + slotSize / 2, slotY + 14);
+          // 冷却条 / 就绪
+          const def = slot.def;
+          const ready = slot.cooldown <= 0;
+          const barY = slotY + slotSize - 12;
+          if (ready) {
+            ctx.fillStyle = '#2ecc71';
+            ctx.font = 'bold 11px Arial';
+            ctx.fillText('就绪', x + slotSize / 2, barY + 6);
+          } else {
+            // 冷却进度条
+            const pct = 1 - (slot.cooldown / def.cooldown);
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.fillRect(x + 4, barY + 2, slotSize - 8, 8);
+            ctx.fillStyle = '#e67e22';
+            ctx.fillRect(x + 4, barY + 2, (slotSize - 8) * pct, 8);
+            // 剩余时间
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px Arial';
+            ctx.fillText(slot.cooldown.toFixed(1) + 's', x + slotSize / 2, barY - 2);
+          }
+          // 伤害数值（小字，底部中心）
+          ctx.fillStyle = 'rgba(255,255,255,0.75)';
+          ctx.font = '10px Arial';
+          ctx.fillText('x' + def.damageMult, x + slotSize / 2, slotY + slotSize - 24);
+        } else {
+          // 空槽位：灰色提示
+          ctx.fillStyle = 'rgba(255,255,255,0.3)';
+          ctx.font = '11px Arial';
+          ctx.fillText('空', x + slotSize / 2, slotY + slotSize / 2);
+        }
+      }
+    }
 
     // 死亡画面
     if (!player.alive) {

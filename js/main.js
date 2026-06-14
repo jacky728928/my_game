@@ -4,6 +4,8 @@ let enemies = [];
 let bullets = [];
 let xpOrbs = [];
 let damageNumbers = [];    // {x,y,value,isCrit,life}
+let grenades = [];          // 延迟爆炸：手雷飞行中的投掷物
+let explosions = [];          // 爆炸视觉效果 {x,y,radius,maxRadius,life,maxLife,color}
 let spawnTimer = 0;
 let spawnInterval = SPAWN_INTERVAL_INIT;
 let gameTime = 0;
@@ -90,10 +92,161 @@ function attack() {
 
   player.doAttack();
   const angle = Math.atan2(nearest.dy, nearest.dx);
-  // 决定本次是否暴击
   const roll = player.rollAttack();
   bullets.push(new Bullet(player.x, player.y, angle, roll.damage, roll.isCrit));
   player.angle = angle;
+}
+
+// 查找最近的存活敌人（用于副武器自动锁定）
+function findNearestEnemy(maxRange) {
+  let nearest = null;
+  let minDist = maxRange;
+  for (let e of enemies) {
+    if (!e.alive) continue;
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < minDist) {
+      minDist = dist;
+      nearest = { enemy: e, dist, dx, dy };
+    }
+  }
+  return nearest;
+}
+
+// AOE 伤害：对指定位置半径范围内所有敌人造成伤害
+function applyAoeDamage(x, y, radius, damage) {
+  for (let e of enemies) {
+    if (!e.alive) continue;
+    const dx = e.x - x;
+    const dy = e.y - y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist <= radius + e.radius) {
+      const dmgVal = Math.round(damage * 10) / 10;
+      e.takeDamage(damage);
+      addDamageNumber(e.x, e.y, dmgVal, true);
+      if (!e.alive) {
+        window._killCount++;
+        xpOrbs.push(new XpOrb(e.x, e.y, e.level));
+      }
+    }
+  }
+}
+
+// 视觉：创建一个爆炸环扩散效果
+function createExplosion(x, y, radius, color) {
+  explosions.push({
+    x, y,
+    radius: 0,
+    maxRadius: radius,
+    life: 0.5,
+    maxLife: 0.5,
+    color: color,
+  });
+}
+
+// 副武器：每个的冷却时间 + 触发
+function updateSecondaryWeapons(dt) {
+  const baseDmg = player.effectiveDamage;
+
+  for (let i = 0; i < player.secondaryWeapons.length; i++) {
+    const slot = player.secondaryWeapons[i];
+    slot.cooldown = Math.max(0, slot.cooldown - dt);
+    if (slot.cooldown > 0) continue;
+
+    const def = slot.def;
+
+    if (def.type === 'heal') {
+      // 医疗包：恢复生命
+      const heal = Math.round(baseDmg * def.damageMult);
+      player.hp = Math.min(player.maxHp, player.hp + heal);
+      // 显示治疗数字（绿色）
+      damageNumbers.push({
+        x: player.x + (Math.random() - 0.5) * 20,
+        y: player.y - player.radius - 10,
+        value: heal,
+        isCrit: false,
+        isHeal: true,
+        life: DAMAGE_NUM_LIFE,
+        maxLife: DAMAGE_NUM_LIFE,
+      });
+      slot.cooldown = def.cooldown;
+      continue;
+    }
+
+    if (def.type === 'aoe_direct') {
+      // 榴弹炮：找最近敌人（搜索半径不限制），直接 AOE 命中
+      const target = findNearestEnemy(1e9);
+      if (!target) continue;
+      const dmg = baseDmg * def.damageMult;
+      applyAoeDamage(target.enemy.x, target.enemy.y, def.aoeRadius, dmg);
+      createExplosion(target.enemy.x, target.enemy.y, def.aoeRadius, def.color);
+      slot.cooldown = def.cooldown;
+      continue;
+    }
+
+    if (def.type === 'aoe_delayed') {
+      // 手雷：向最近敌人位置投掷，5秒后爆炸
+      const target = findNearestEnemy(1e9);
+      if (!target) continue;
+      const tx = target.enemy.x;
+      const ty = target.enemy.y;
+      // 飞行轨迹参数
+      const dx = tx - player.x;
+      const dy = ty - player.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const flyTime = Math.max(0.6, Math.min(1.6, dist / 350));  // 距离/速度，约1秒
+      grenades.push({
+        x: player.x,
+        y: player.y,
+        startX: player.x,
+        startY: player.y,
+        targetX: tx,
+        targetY: ty,
+        flyTime: flyTime,
+        flyElapsed: 0,
+        fuseTime: def.fuseTime,
+        fuseElapsed: 0,
+        dmg: baseDmg * def.damageMult,
+        aoeRadius: def.aoeRadius,
+        color: def.color,
+        exploding: false,
+        landed: false,
+      });
+      slot.cooldown = def.cooldown;
+      continue;
+    }
+  }
+
+  // 手雷飞行与爆炸
+  for (let g of grenades) {
+    if (!g.landed) {
+      g.flyElapsed += dt;
+      const t = Math.min(1, g.flyElapsed / g.flyTime);
+      g.x = g.startX + (g.targetX - g.startX) * t;
+      g.y = g.startY + (g.targetY - g.startY) * t;
+      if (t >= 1) {
+        g.landed = true;
+      }
+    } else {
+      g.fuseElapsed += dt;
+      if (g.fuseElapsed >= g.fuseTime) {
+        // 爆炸
+        applyAoeDamage(g.x, g.y, g.aoeRadius, g.dmg);
+        createExplosion(g.x, g.y, g.aoeRadius, g.color);
+        g.exploding = true;
+      }
+    }
+  }
+  grenades = grenades.filter(g => !g.exploding);
+
+  // 爆炸视觉衰减
+  for (let ex of explosions) {
+    ex.life -= dt;
+    const t = 1 - (ex.life / ex.maxLife);
+    ex.radius = ex.maxRadius * t;
+  }
+  explosions = explosions.filter(e => e.life > 0);
 }
 
 function update(dt) {
@@ -104,6 +257,9 @@ function update(dt) {
   player.setVelocity(ix * player.speed, iy * player.speed);
   player.update(dt, bullets);
   attack();
+
+  // 副武器：冷却计时 + 自动触发
+  updateSecondaryWeapons(dt);
 
   // 子弹碰撞
   for (let b of bullets) {
@@ -151,7 +307,7 @@ function update(dt) {
     const gained = orb.update(dt, player);
     if (gained > 0) {
       const leveled = player.addXp(gained);
-      if (leveled && player.pendingLevelUps > 0 && !gamePaused) {
+      if (leveled && player.pendingLevelUps.length > 0 && !gamePaused) {
         triggerLevelUpUi();
       }
     }
@@ -188,15 +344,167 @@ function pickRandomChoices(n) {
 
 function triggerLevelUpUi() {
   gamePaused = true;
-  levelUpChoices = pickRandomChoices(3);
-  openLevelUpUi();
+  // 判断当前是否触发副武器升级等级（第5级或10n级）
+  // 注：player.level 在 addXp 中已升级，因此需要看“刚升到的等级”
+  // 简单做法：检查“玩家当前等级”是否为 5 或 10 的倍数
+  // 但如果连升多级（从3→6），应取最高的一个等级作判定（否则可能错过特殊等级）
+  // 方案：检查本次升级后是否命中了特殊等级——跟踪当前level与pendingLevelUps
+  const pending = player.pendingLevelUps[0];
+  const isSecondary = pending && pending.type === 'secondary';
+
+  if (isSecondary) {
+    // 弹出副武器选择：列出所有副武器（当前已装备的禁止重复）
+    levelUpChoices = SECONDARY_WEAPON_LIST.map(w => ({ ...w }));
+    openSecondaryWeaponUi();
+  } else {
+    levelUpChoices = pickRandomChoices(3);
+    openLevelUpUi();
+  }
+}
+
+// 副武器选择后：如已达上限则先弹丢弃选择
+function onChooseSecondaryWeapon(weaponId) {
+  if (player.hasSecondaryWeapon(weaponId)) return; // 已装备同名，不重复选
+  if (player.secondaryWeapons.length < MAX_SECONDARY_WEAPONS) {
+    player.equipSecondaryWeapon(weaponId);
+    player.pendingLevelUps.shift();
+    closeLevelUpUi();
+    if (player.pendingLevelUps.length > 0) {
+      setTimeout(() => triggerLevelUpUi(), 80);
+    } else {
+      gamePaused = false;
+    }
+  } else {
+    // 超过上限：打开丢弃选择界面
+    openDiscardUi(weaponId);
+  }
+}
+
+// 打开丢弃界面（在“武器超过3个时”使用）
+function openDiscardUi(newWeaponId) {
+  closeLevelUpUi();
+  const container = document.createElement('div');
+  container.id = 'levelUpUi';
+  container.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;color:#fff;user-select:none;';
+
+  const title = document.createElement('div');
+  title.textContent = '⚠ 副武器已满（最多 ' + MAX_SECONDARY_WEAPONS + ' 个），请选择要丢弃的副武器，否则放弃获得新武器';
+  title.style.cssText = 'font-size:16px;font-weight:bold;margin-bottom:22px;color:#f1c40f;text-align:center;max-width:620px;';
+  container.appendChild(title);
+
+  const cards = document.createElement('div');
+  cards.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;justify-content:center;';
+
+  // 列出当前已装备的副武器供丢弃
+  player.secondaryWeapons.forEach(slot => {
+    const def = slot.def;
+    const card = document.createElement('div');
+    card.style.cssText = 'width:200px;padding:18px 16px;border:2px solid ' + def.color + ';border-radius:14px;background:rgba(26,26,46,0.85);cursor:pointer;transition:all 0.15s;text-align:center;';
+    card.onmouseenter = () => { card.style.transform = 'translateY(-2px)'; card.style.boxShadow = '0 4px 14px rgba(0,0,0,0.5)'; };
+    card.onmouseleave = () => { card.style.transform = 'translateY(0)'; card.style.boxShadow = 'none'; };
+
+    const name = document.createElement('div');
+    name.textContent = '[丢弃] ' + def.name;
+    name.style.cssText = 'font-size:16px;font-weight:bold;color:' + def.color + ';margin-bottom:8px;';
+
+    const desc = document.createElement('div');
+    desc.textContent = def.desc;
+    desc.style.cssText = 'font-size:12px;color:#ddd;line-height:1.4;';
+
+    card.appendChild(name);
+    card.appendChild(desc);
+    card.onclick = () => {
+      player.discardSecondaryWeapon(slot.id);
+      player.equipSecondaryWeapon(newWeaponId);
+      player.pendingLevelUps.shift();
+      closeLevelUpUi();
+      if (player.pendingLevelUps.length > 0) {
+        setTimeout(() => triggerLevelUpUi(), 80);
+      } else {
+        gamePaused = false;
+      }
+    };
+    cards.appendChild(card);
+  });
+
+  // 放弃获得新武器的选项
+  const giveUp = document.createElement('div');
+  giveUp.textContent = '放弃新武器';
+  giveUp.style.cssText = 'width:150px;padding:18px 16px;border:2px solid #555;border-radius:14px;background:rgba(26,26,46,0.7);cursor:pointer;transition:all 0.15s;text-align:center;font-size:14px;color:#999;';
+  giveUp.onmouseenter = () => { giveUp.style.transform = 'translateY(-2px)'; };
+  giveUp.onmouseleave = () => { giveUp.style.transform = 'translateY(0)'; };
+  giveUp.onclick = () => {
+    player.pendingLevelUps.shift();
+    closeLevelUpUi();
+    if (player.pendingLevelUps.length > 0) {
+      setTimeout(() => triggerLevelUpUi(), 80);
+    } else {
+      gamePaused = false;
+    }
+  };
+  cards.appendChild(giveUp);
+
+  container.appendChild(cards);
+  document.body.appendChild(container);
+  levelUpUi = container;
+}
+
+// 打开副武器选择窗口：列出所有副武器（已装备的灰掉不可选）
+function openSecondaryWeaponUi() {
+  closeLevelUpUi();
+  const container = document.createElement('div');
+  container.id = 'levelUpUi';
+  container.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;color:#fff;user-select:none;';
+
+  const title = document.createElement('div');
+  const pending = player.pendingLevelUps[0];
+  const showLevel = pending ? pending.level : player.level;
+  title.textContent = '★ 第 ' + showLevel + ' 级！选择一个副武器 ★';
+  title.style.cssText = 'font-size:26px;font-weight:bold;margin-bottom:22px;color:#f1c40f;text-shadow:0 2px 8px rgba(0,0,0,0.6);';
+  container.appendChild(title);
+
+  const info = document.createElement('div');
+  info.textContent = '当前已装备 ' + player.secondaryWeapons.length + ' / ' + MAX_SECONDARY_WEAPONS + ' 个副武器（超过上限会进入丢弃选择）';
+  info.style.cssText = 'font-size:13px;color:#aaa;margin-bottom:18px;';
+  container.appendChild(info);
+
+  const cards = document.createElement('div');
+  cards.style.cssText = 'display:flex;gap:18px;flex-wrap:wrap;justify-content:center;';
+
+  levelUpChoices.forEach((choice) => {
+    const alreadyEquipped = player.hasSecondaryWeapon(choice.id);
+    const card = document.createElement('div');
+    const borderColor = alreadyEquipped ? '#555' : (choice.color || '#f1c40f');
+    card.style.cssText = 'width:220px;padding:20px 18px;border:2px solid ' + borderColor + ';border-radius:14px;background:rgba(26,26,46,0.85);cursor:pointer;transition:all 0.15s;text-align:center;' + (alreadyEquipped ? 'opacity:0.5;cursor:not-allowed;' : '');
+
+    if (!alreadyEquipped) {
+      card.onmouseenter = () => { card.style.transform = 'translateY(-2px)'; card.style.boxShadow = '0 4px 14px rgba(0,0,0,0.5)'; };
+      card.onmouseleave = () => { card.style.transform = 'translateY(0)'; card.style.boxShadow = 'none'; };
+      card.onclick = () => onChooseSecondaryWeapon(choice.id);
+    }
+
+    const name = document.createElement('div');
+    name.textContent = choice.name + (alreadyEquipped ? '（已装备）' : '');
+    name.style.cssText = 'font-size:18px;font-weight:bold;color:' + borderColor + ';margin-bottom:10px;';
+
+    const desc = document.createElement('div');
+    desc.textContent = choice.desc;
+    desc.style.cssText = 'font-size:12px;color:#ddd;line-height:1.4;';
+
+    card.appendChild(name);
+    card.appendChild(desc);
+    cards.appendChild(card);
+  });
+  container.appendChild(cards);
+  document.body.appendChild(container);
+  levelUpUi = container;
 }
 
 function onChooseAbility(abilityId) {
   player.applyAbility(abilityId);
-  player.pendingLevelUps = Math.max(0, player.pendingLevelUps - 1);
+  player.pendingLevelUps.shift();
   closeLevelUpUi();
-  if (player.pendingLevelUps > 0) {
+  if (player.pendingLevelUps.length > 0) {
     // 连升多级，再次弹出
     setTimeout(() => triggerLevelUpUi(), 80);
   } else {
@@ -396,7 +704,7 @@ function gameLoop() {
   if (dt > 0.1) dt = 0.1;
 
   update(dt);
-  renderer.render(player, enemies, bullets, xpOrbs, damageNumbers);
+  renderer.render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, explosions);
   minimap.render(player, enemies, player.x, player.y);
 
   requestAnimationFrame(gameLoop);

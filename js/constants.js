@@ -71,3 +71,47 @@ const ABILITY_POOL = [
 // 伤害数字显示
 const DAMAGE_NUM_LIFE = 0.9;            // 数字存活秒数
 const DAMAGE_NUM_SPEED = 40;            // 上升速度（像素/秒）
+
+// ========== 副武器系统 ==========
+const MAX_SECONDARY_WEAPONS = 3;        // 最多同时装备 3 个副武器
+
+// 副武器池（按 id 描述静态参数）
+const SECONDARY_WEAPON_POOL = {
+  grenade_launcher: {
+    id: 'grenade_launcher',
+    name: '榴弹炮',
+    desc: '15秒一发，对最近敌人造成基础攻击×300% 范围伤害（半径80px）',
+    cooldown: 15.0,
+    damageMult: 3.0,
+    aoeRadius: 80,
+    color: '#e67e22',
+    type: 'aoe_direct',
+  },
+  grenade: {
+    id: 'grenade',
+    name: '手雷',
+    desc: '30秒一发，自动丢向最近敌人脚下，5秒后爆炸，造成基础攻击×500% 范围伤害（半径120px）',
+    cooldown: 30.0,
+    damageMult: 5.0,
+    aoeRadius: 120,
+    fuseTime: 5.0,
+    color: '#e74c3c',
+    type: 'aoe_delayed',
+  },
+  medkit: {
+    id: 'medkit',
+    name: '医疗包',
+    desc: '10秒自动使用一次，恢复基础攻击×1000% 的生命值',
+    cooldown: 10.0,
+    damageMult: 10.0,
+    color: '#2ecc71',
+    type: 'heal',
+  },
+};
+
+// 副武器列表（用于弹出选项时迭代）
+const SECONDARY_WEAPON_LIST = [
+  SECONDARY_WEAPON_POOL.grenade_launcher,
+  SECONDARY_WEAPON_POOL.grenade,
+  SECONDARY_WEAPON_POOL.medkit,
+];
