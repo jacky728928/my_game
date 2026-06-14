@@ -155,7 +155,7 @@ class Player {
     this.secondaryWeapons.push({
       id: def.id,
       def: def,
-      cooldown: def.cooldown,        // 首次稍快触发一些？默认满冷却
+      cooldown: 0,              // 装备后立即可触发
     });
   }
 

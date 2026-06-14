@@ -16,7 +16,7 @@ class Renderer {
     this.h = window.innerHeight;
   }
 
-  render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, explosions) {
+  render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, explosions, particles, targetMarkers) {
     const ctx = this.ctx;
     const camX = player.x;
     const camY = player.y;
@@ -118,45 +118,94 @@ class Renderer {
       ctx.stroke();
     }
 
-    // 手雷（飞行中）
+    // 手雷（飞行 + 落地）
     if (grenades && grenades.length > 0) {
       for (let g of grenades) {
         const gx = g.x - camX + cx;
         const gy = g.y - camY + cy;
-        if (gx < -50 || gx > this.w + 50 || gy < -50 || gy > this.h + 50) continue;
-        // 飞行中的手雷：红色小圆 + 闪烁
+        if (gx < -100 || gx > this.w + 100 || gy < -100 || gy > this.h + 100) continue;
+
         if (!g.landed) {
+          // 飞行中的手雷：大外圈发光 + 本体 + 高光
+          ctx.save();
+          // 外发光
+          ctx.shadowColor = g.color || '#e74c3c';
+          ctx.shadowBlur = 25;
           ctx.fillStyle = g.color || '#e74c3c';
-          ctx.shadowColor = '#fff';
-          ctx.shadowBlur = 4;
           ctx.beginPath();
-          ctx.arc(gx, gy, 6, 0, Math.PI * 2);
+          ctx.arc(gx, gy, 8, 0, Math.PI * 2);
           ctx.fill();
+          // 白色高光
           ctx.shadowBlur = 0;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(gx - 2, gy - 2, 3, 0, Math.PI * 2);
+          ctx.fill();
+          // 深色描边
+          ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(gx, gy, 8, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
         } else {
-          // 落地后的手雷：红色闪光 + 剩余引信时间显示
-          const blink = Math.floor(now * 8) % 2 === 0 ? 1 : 0.5;
-          ctx.fillStyle = g.color || '#e74c3c';
+          // 落地后的手雷：急促闪烁 + 逐渐变密的AOE圈 + 倒计时
+          const fuseLeft = Math.max(0, g.fuseTime - g.fuseElapsed);
+          const fuseProgress = g.fuseElapsed / g.fuseTime;
+          // 闪烁：越接近爆炸越频繁
+          const blinkFreq = 3 + fuseProgress * 20;
+          const blink = (Math.floor(g.fuseElapsed * blinkFreq) % 2 === 0) ? 1 : 0.35;
+          const intensity = 0.5 + fuseProgress * 0.5;
+
+          ctx.save();
+          // 内圈高亮光晕（颜色从黄->红）
+          const coreColor = fuseProgress < 0.5 ? '#ffe066' : '#ff4422';
+          ctx.shadowColor = coreColor;
+          ctx.shadowBlur = 30 * intensity;
+          ctx.fillStyle = coreColor;
           ctx.globalAlpha = blink;
           ctx.beginPath();
-          ctx.arc(gx, gy, 6, 0, Math.PI * 2);
+          ctx.arc(gx, gy, 6 + intensity * 4, 0, Math.PI * 2);
           ctx.fill();
+
+          // 深色内核
           ctx.globalAlpha = 1;
-          // AOE 范围提示
-          ctx.strokeStyle = 'rgba(231,76,60,0.45)';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([4, 4]);
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#330000';
           ctx.beginPath();
-          ctx.arc(gx, gy, g.aoeRadius, 0, Math.PI * 2);
+          ctx.arc(gx, gy, 5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // AOE 范围：多圈，越接近爆炸越亮越抖动
+          const pulse = Math.sin(g.fuseElapsed * 14) * 3;
+          ctx.globalAlpha = 0.25 + intensity * 0.35;
+          ctx.strokeStyle = g.color || '#e74c3c';
+          ctx.lineWidth = 2 + intensity * 2;
+          ctx.setLineDash([8, 6]);
+          ctx.beginPath();
+          ctx.arc(gx, gy, g.aoeRadius + pulse, 0, Math.PI * 2);
           ctx.stroke();
+          // 内圈
           ctx.setLineDash([]);
-          // 引信倒计时数字
-          const fuseLeft = Math.max(0, g.fuseTime - g.fuseElapsed);
-          ctx.fillStyle = '#fff';
-          ctx.font = 'bold 11px Arial';
+          ctx.lineWidth = 1;
+          ctx.globalAlpha = 0.15 * intensity;
+          ctx.fillStyle = g.color || '#e74c3c';
+          ctx.beginPath();
+          ctx.arc(gx, gy, g.aoeRadius * 0.4, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 引信倒计时数字（大字、描边）
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = '#ffffff';
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 3;
+          ctx.font = 'bold 16px Arial';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'bottom';
-          ctx.fillText(fuseLeft.toFixed(1) + 's', gx, gy - 10);
+          const txt = fuseLeft.toFixed(1) + 's';
+          ctx.strokeText(txt, gx, gy - 14);
+          ctx.fillText(txt, gx, gy - 14);
+          ctx.restore();
         }
       }
     }

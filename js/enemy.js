@@ -7,6 +7,7 @@ class Enemy {
     this.level = this.tier.level;
     this.size = this.tier.size;
     this.half = this.size / 2;
+    this.radius = this.half;       // AOE 碰撞判定用的半径
     this.hp = this.tier.hp;
     this.maxHp = this.tier.hp;
     this.color = this.tier.color;

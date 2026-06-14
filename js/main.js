@@ -5,8 +5,17 @@ let bullets = [];
 let xpOrbs = [];
 let damageNumbers = [];    // {x,y,value,isCrit,life}
 let grenades = [];          // 延迟爆炸：手雷飞行中的投掷物
-let explosions = [];          // 爆炸视觉效果 {x,y,radius,maxRadius,life,maxLife,color}
+let explosions = [];        // 爆炸视觉效果（闪光+冲击波）
+let particles = [];         // 通用粒子（爆炸碎片/烟雾/火星）
+let targetMarkers = [];     // 目标锁定指示（榴弹炮瞄准时显示）
 let spawnTimer = 0;
+// 武器攻击禁用状态
+let weaponAttackDisabled = {
+  primary: false,   // 主武器
+  slot1: false,     // 副武器槽位1
+  slot2: false,     // 副武器槽位2
+  slot3: false,     // 副武器槽位3
+};
 let spawnInterval = SPAWN_INTERVAL_INIT;
 let gameTime = 0;
 window._killCount = 0;
@@ -75,6 +84,7 @@ function spawnEnemy() {
 }
 
 function attack() {
+  if (weaponAttackDisabled.primary) return;
   if (!player.canAttack() || enemies.length === 0) return;
   let nearest = null;
   let minDist = player.effectiveAttackRange;
@@ -133,15 +143,87 @@ function applyAoeDamage(x, y, radius, damage) {
   }
 }
 
-// 视觉：创建一个爆炸环扩散效果
-function createExplosion(x, y, radius, color) {
+// 创建爆炸：包含多层冲击波、中心闪光、粒子碎片、烟雾
+function createExplosion(x, y, radius, color, extra) {
+  const maxLife = 0.8;
   explosions.push({
     x, y,
     radius: 0,
     maxRadius: radius,
-    life: 0.5,
-    maxLife: 0.5,
+    life: maxLife,
+    maxLife: maxLife,
     color: color,
+    type: (extra && extra.type) || 'big',   // 'big'=手雷, 'medium'=榴弹炮
+  });
+
+  // 中心闪光粒子：一次性产生 24~40 片
+  const debrisCount = 32;
+  for (let i = 0; i < debrisCount; i++) {
+    const angle = (i / debrisCount) * Math.PI * 2 + Math.random() * 0.3;
+    const speed = (80 + Math.random() * 120) * (radius / 80);
+    const colorList = ['#ffffff', color, '#ffdd55', '#ff7722', '#d82c2c'];
+    particles.push({
+      type: 'debris',
+      x: x,
+      y: y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 4,
+      life: 0.5 + Math.random() * 0.4,
+      maxLife: 0.9,
+      color: colorList[Math.floor(Math.random() * colorList.length)],
+      drag: 2.8,
+    });
+  }
+
+  // 烟雾粒子（较大、慢速、灰色/橙色、淡出）
+  const smokeCount = 14;
+  for (let i = 0; i < smokeCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 15 + Math.random() * 35;
+    particles.push({
+      type: 'smoke',
+      x: x + (Math.random() - 0.5) * radius * 0.3,
+      y: y + (Math.random() - 0.5) * radius * 0.3,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 10,
+      size: 10 + Math.random() * 18,
+      life: 0.7 + Math.random() * 0.6,
+      maxLife: 1.3,
+      color: Math.random() < 0.5 ? '#555555' : '#7a4a28',
+      drag: 0.8,
+      grow: 25,        // 随时间扩大
+    });
+  }
+
+  // 火花（快速上升的小亮点）
+  const sparkCount = 20;
+  for (let i = 0; i < sparkCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 120 + Math.random() * 180;
+    particles.push({
+      type: 'spark',
+      x: x,
+      y: y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 40,
+      size: 1.5 + Math.random() * 2,
+      life: 0.3 + Math.random() * 0.4,
+      maxLife: 0.7,
+      color: Math.random() < 0.5 ? '#ffe066' : '#ffb347',
+      drag: 1.5,
+    });
+  }
+}
+
+// 创建目标锁定指示器（用于榴弹炮瞄准）
+function createTargetMarker(x, y, radius, color) {
+  targetMarkers.push({
+    x, y,
+    radius: radius,
+    life: 0.45,
+    maxLife: 0.45,
+    color: color || '#e67e22',
   });
 }
 
@@ -150,6 +232,8 @@ function updateSecondaryWeapons(dt) {
   const baseDmg = player.effectiveDamage;
 
   for (let i = 0; i < player.secondaryWeapons.length; i++) {
+    // 检查该槽位是否被禁用
+    if (weaponAttackDisabled['slot' + (i + 1)]) continue;
     const slot = player.secondaryWeapons[i];
     slot.cooldown = Math.max(0, slot.cooldown - dt);
     if (slot.cooldown > 0) continue;
@@ -179,6 +263,8 @@ function updateSecondaryWeapons(dt) {
       const target = findNearestEnemy(1e9);
       if (!target) continue;
       const dmg = baseDmg * def.damageMult;
+      // 目标锁定指示（爆炸前一瞬高亮）
+      createTargetMarker(target.enemy.x, target.enemy.y, def.aoeRadius, def.color);
       applyAoeDamage(target.enemy.x, target.enemy.y, def.aoeRadius, dmg);
       createExplosion(target.enemy.x, target.enemy.y, def.aoeRadius, def.color);
       slot.cooldown = def.cooldown;
@@ -225,11 +311,62 @@ function updateSecondaryWeapons(dt) {
       const t = Math.min(1, g.flyElapsed / g.flyTime);
       g.x = g.startX + (g.targetX - g.startX) * t;
       g.y = g.startY + (g.targetY - g.startY) * t;
+      // 飞行尾迹：每隔几帧喷一颗小火花
+      if (Math.random() < 0.6) {
+        particles.push({
+          type: 'trail',
+          x: g.x + (Math.random() - 0.5) * 6,
+          y: g.y + (Math.random() - 0.5) * 6,
+          vx: (Math.random() - 0.5) * 20,
+          vy: (Math.random() - 0.5) * 20 - 15,
+          size: 3 + Math.random() * 2,
+          life: 0.2 + Math.random() * 0.2,
+          maxLife: 0.4,
+          color: Math.random() < 0.5 ? '#ffbb33' : '#ff6622',
+          drag: 2.0,
+        });
+      }
       if (t >= 1) {
         g.landed = true;
+        // 落地时溅射一些碎片
+        for (let i = 0; i < 8; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const s = 40 + Math.random() * 50;
+          particles.push({
+            type: 'debris',
+            x: g.x, y: g.y,
+            vx: Math.cos(a) * s,
+            vy: Math.sin(a) * s,
+            size: 2 + Math.random() * 2,
+            life: 0.3 + Math.random() * 0.2,
+            maxLife: 0.5,
+            color: '#aaaaaa',
+            drag: 2.5,
+          });
+        }
       }
     } else {
       g.fuseElapsed += dt;
+      // 引信倒计时：越接近爆炸越频繁地喷火花
+      const fuseProgress = g.fuseElapsed / g.fuseTime;
+      const sparkRate = 3 + fuseProgress * 18; // 开始 3/s，结束 21/s
+      const sparkChance = Math.min(1, sparkRate * dt);
+      if (Math.random() < sparkChance) {
+        const a = Math.random() * Math.PI * 2;
+        const s = 30 + Math.random() * 90 * fuseProgress;
+        particles.push({
+          type: 'spark',
+          x: g.x + (Math.random() - 0.5) * 10,
+          y: g.y + (Math.random() - 0.5) * 10,
+          vx: Math.cos(a) * s,
+          vy: Math.sin(a) * s - 30,
+          size: 1.5 + Math.random() * 2,
+          life: 0.25 + Math.random() * 0.3,
+          maxLife: 0.55,
+          color: Math.random() < 0.3 ? '#ffffff' : '#ffaa33',
+          drag: 1.8,
+        });
+      }
       if (g.fuseElapsed >= g.fuseTime) {
         // 爆炸
         applyAoeDamage(g.x, g.y, g.aoeRadius, g.dmg);
@@ -244,9 +381,31 @@ function updateSecondaryWeapons(dt) {
   for (let ex of explosions) {
     ex.life -= dt;
     const t = 1 - (ex.life / ex.maxLife);
-    ex.radius = ex.maxRadius * t;
+    // 缓出：前期快速扩散
+    ex.radius = ex.maxRadius * (1 - Math.pow(1 - t, 2.5));
   }
   explosions = explosions.filter(e => e.life > 0);
+
+  // 粒子更新（所有类型统一）
+  for (let p of particles) {
+    p.life -= dt;
+    // 阻尼（drag 越大减速越快）
+    const damp = Math.max(0, 1 - p.drag * dt);
+    p.vx *= damp;
+    p.vy *= damp;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    if (p.grow) {
+      p.size += p.grow * dt;
+    }
+  }
+  particles = particles.filter(p => p.life > 0);
+
+  // 目标锁定指示更新
+  for (let m of targetMarkers) {
+    m.life -= dt;
+  }
+  targetMarkers = targetMarkers.filter(m => m.life > 0);
 }
 
 function update(dt) {
@@ -451,7 +610,10 @@ function openDiscardUi(newWeaponId) {
 
 // 打开副武器选择窗口：列出所有副武器（已装备的灰掉不可选）
 function openSecondaryWeaponUi() {
+  // 先保存选项再清理（和 openLevelUpUi 一样的模式）
+  const choices = levelUpChoices;
   closeLevelUpUi();
+  levelUpChoices = choices;
   const container = document.createElement('div');
   container.id = 'levelUpUi';
   container.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;color:#fff;user-select:none;';
@@ -671,6 +833,68 @@ function createDevPanel() {
   };
   panel.appendChild(xpMulBtn);
 
+  // 分隔线
+  const sep = document.createElement('hr');
+  sep.style.cssText = 'width:100%;border:none;border-top:1px solid rgba(255,255,255,0.2);margin:8px 0;';
+  panel.appendChild(sep);
+
+  const sepTitle = document.createElement('div');
+  sepTitle.textContent = '⚔ 武器控制';
+  sepTitle.style.cssText = 'font-weight:bold;margin-bottom:6px;color:#e74c3c;font-size:11px;';
+  panel.appendChild(sepTitle);
+
+  // 主武器停止按钮
+  const primaryBtn = document.createElement('button');
+  const updatePrimaryBtn = () => {
+    primaryBtn.textContent = '主武器: ' + (weaponAttackDisabled.primary ? '已停止' : '进行中');
+    primaryBtn.style.cssText = 'width:100%;margin-bottom:4px;padding:5px 10px;background:' + (weaponAttackDisabled.primary ? '#c0392b' : '#27ae60') + ';border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:11px;';
+  };
+  updatePrimaryBtn();
+  primaryBtn.onclick = () => {
+    weaponAttackDisabled.primary = !weaponAttackDisabled.primary;
+    updatePrimaryBtn();
+  };
+  panel.appendChild(primaryBtn);
+
+  // 副武器1停止按钮
+  const slot1Btn = document.createElement('button');
+  const updateSlot1Btn = () => {
+    slot1Btn.textContent = '1号副武器: ' + (weaponAttackDisabled.slot1 ? '已停止' : '进行中');
+    slot1Btn.style.cssText = 'width:100%;margin-bottom:4px;padding:5px 10px;background:' + (weaponAttackDisabled.slot1 ? '#c0392b' : '#27ae60') + ';border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:11px;';
+  };
+  updateSlot1Btn();
+  slot1Btn.onclick = () => {
+    weaponAttackDisabled.slot1 = !weaponAttackDisabled.slot1;
+    updateSlot1Btn();
+  };
+  panel.appendChild(slot1Btn);
+
+  // 副武器2停止按钮
+  const slot2Btn = document.createElement('button');
+  const updateSlot2Btn = () => {
+    slot2Btn.textContent = '2号副武器: ' + (weaponAttackDisabled.slot2 ? '已停止' : '进行中');
+    slot2Btn.style.cssText = 'width:100%;margin-bottom:4px;padding:5px 10px;background:' + (weaponAttackDisabled.slot2 ? '#c0392b' : '#27ae60') + ';border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:11px;';
+  };
+  updateSlot2Btn();
+  slot2Btn.onclick = () => {
+    weaponAttackDisabled.slot2 = !weaponAttackDisabled.slot2;
+    updateSlot2Btn();
+  };
+  panel.appendChild(slot2Btn);
+
+  // 副武器3停止按钮
+  const slot3Btn = document.createElement('button');
+  const updateSlot3Btn = () => {
+    slot3Btn.textContent = '3号副武器: ' + (weaponAttackDisabled.slot3 ? '已停止' : '进行中');
+    slot3Btn.style.cssText = 'width:100%;margin-bottom:4px;padding:5px 10px;background:' + (weaponAttackDisabled.slot3 ? '#c0392b' : '#27ae60') + ';border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:11px;';
+  };
+  updateSlot3Btn();
+  slot3Btn.onclick = () => {
+    weaponAttackDisabled.slot3 = !weaponAttackDisabled.slot3;
+    updateSlot3Btn();
+  };
+  panel.appendChild(slot3Btn);
+
   // 关闭按钮
   const closeBtn = document.createElement('button');
   closeBtn.textContent = '隐藏面板';
@@ -704,7 +928,7 @@ function gameLoop() {
   if (dt > 0.1) dt = 0.1;
 
   update(dt);
-  renderer.render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, explosions);
+  renderer.render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, explosions, particles, targetMarkers);
   minimap.render(player, enemies, player.x, player.y);
 
   requestAnimationFrame(gameLoop);
