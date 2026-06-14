@@ -24,6 +24,8 @@ let gameOver = false;
 let gamePaused = false;
 let levelUpChoices = null;   // 当前三选一选项
 let levelUpUi = null;         // UI 元素引用
+let screenShake = { intensity: 0, duration: 0, elapsed: 0 };  // 屏幕震动
+let cameraFlash = { intensity: 0, duration: 0, elapsed: 0 };  // 镜头闪光
 
 function init() {
   player = new Player();
@@ -196,6 +198,21 @@ function findNearestEnemy(maxRange) {
   return nearest;
 }
 
+function findNearestEnemies(count, maxRange) {
+  const sorted = [];
+  for (let e of enemies) {
+    if (!e.alive) continue;
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < maxRange) {
+      sorted.push({ enemy: e, dist, dx, dy });
+    }
+  }
+  sorted.sort((a, b) => a.dist - b.dist);
+  return sorted.slice(0, count);
+}
+
 // AOE 伤害：对指定位置半径范围内所有敌人造成伤害
 function applyAoeDamage(x, y, radius, damage) {
   for (let e of enemies) {
@@ -215,95 +232,130 @@ function applyAoeDamage(x, y, radius, damage) {
   }
 }
 
-// 创建爆炸：多层冲击波 + 中心闪光 + 碎片 + 烟雾 + 火花
+// 创建爆炸：多层冲击波 + 中心闪光 + 碎片 + 烟雾 + 火花 + 屏幕震动
 function createExplosion(x, y, radius, color, extra) {
-  // 主冲击波（颜色环）
+  // 屏幕震动（强度随AOE范围缩放）
+  screenShake.intensity = 8 + (radius / 150) * 12;
+  screenShake.duration = 0.35 + (radius / 150) * 0.2;
+  screenShake.elapsed = 0;
+
+  // 第0层：中心白色强光（瞬间出现，快速消失）
+  explosions.push({
+    x, y,
+    radius: 0,
+    maxRadius: radius * 0.45,
+    life: 0.25,
+    maxLife: 0.25,
+    color: '#ffffff',
+    type: 'flash',
+  });
+  // 第1层：主冲击波（颜色环，中等速度）
   explosions.push({
     x, y,
     radius: 0,
     maxRadius: radius,
-    life: 0.8,
-    maxLife: 0.8,
+    life: 0.85,
+    maxLife: 0.85,
     color: color,
     type: 'ring_main',
   });
-  // 第二道冲击波（白色高光环，略小更快）
+  // 第2层：白色高光环（略小更快）
   explosions.push({
     x, y,
     radius: 0,
-    maxRadius: radius * 0.75,
+    maxRadius: radius * 0.7,
     life: 0.5,
     maxLife: 0.5,
     color: '#ffffff',
     type: 'ring_white',
   });
-  // 第三道：外圈橙红扩散
+  // 第3层：外圈橙红扩散（最大最慢）
   explosions.push({
     x, y,
     radius: 0,
-    maxRadius: radius * 1.3,
-    life: 1.0,
-    maxLife: 1.0,
-    color: '#ff5522',
+    maxRadius: radius * 1.5,
+    life: 1.2,
+    maxLife: 1.2,
+    color: '#ff4411',
     type: 'ring_outer',
+  });
+  // 第4层：内层暗红脉冲（快速收缩消失）
+  explosions.push({
+    x, y,
+    radius: radius * 0.9,
+    maxRadius: radius * 0.9,
+    life: 0.3,
+    maxLife: 0.3,
+    color: '#cc1100',
+    type: 'ring_inner',
+  });
+  // 地面烧焦印记（持续久，渐淡）
+  explosions.push({
+    x, y,
+    radius: radius * 0.85,
+    maxRadius: radius * 0.85,
+    life: 3.0,
+    maxLife: 3.0,
+    color: '#1a0a00',
+    type: 'scorch',
   });
 
   // 爆炸碎片：更多、更快、更密集
-  const debrisCount = 50;
+  const debrisCount = 70;
   for (let i = 0; i < debrisCount; i++) {
     const angle = (i / debrisCount) * Math.PI * 2 + Math.random() * 0.4;
-    const speed = (120 + Math.random() * 220) * (radius / 100);
-    const colorList = ['#ffffff', color, '#ffee66', '#ff7722', '#ff3322', '#aa2211'];
+    const speed = (150 + Math.random() * 280) * (radius / 100);
+    const colorList = ['#ffffff', color, '#ffee66', '#ff7722', '#ff3322', '#aa2211', '#ffcc88'];
     particles.push({
       type: 'debris',
       x: x,
       y: y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      size: 2 + Math.random() * 5,
-      life: 0.5 + Math.random() * 0.5,
-      maxLife: 1.0,
+      vy: Math.sin(angle) * speed - 30,
+      size: 2 + Math.random() * 6,
+      life: 0.6 + Math.random() * 0.6,
+      maxLife: 1.2,
       color: colorList[Math.floor(Math.random() * colorList.length)],
-      drag: 2.5,
+      drag: 2.2,
     });
   }
 
   // 烟雾：多团、上升、扩大
-  const smokeCount = 22;
+  const smokeCount = 30;
   for (let i = 0; i < smokeCount; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 20 + Math.random() * 50;
+    const speed = 20 + Math.random() * 60;
     particles.push({
       type: 'smoke',
-      x: x + (Math.random() - 0.5) * radius * 0.4,
-      y: y + (Math.random() - 0.5) * radius * 0.4,
+      x: x + (Math.random() - 0.5) * radius * 0.5,
+      y: y + (Math.random() - 0.5) * radius * 0.5,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 20,
-      size: 14 + Math.random() * 24,
-      life: 0.9 + Math.random() * 0.8,
-      maxLife: 1.7,
-      color: Math.random() < 0.4 ? '#3a3a3a' : (Math.random() < 0.5 ? '#555555' : '#7a4a28'),
-      drag: 0.6,
-      grow: 35,
+      vy: Math.sin(angle) * speed - 30,
+      size: 16 + Math.random() * 28,
+      life: 1.0 + Math.random() * 0.9,
+      maxLife: 1.9,
+      color: Math.random() < 0.35 ? '#2a2a2a' : (Math.random() < 0.5 ? '#555555' : '#7a4a28'),
+      drag: 0.5,
+      grow: 40,
     });
   }
 
   // 火花：大量快速小亮点，向四周喷射并上升
-  const sparkCount = 35;
+  const sparkCount = 45;
   for (let i = 0; i < sparkCount; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 150 + Math.random() * 280;
+    const speed = 180 + Math.random() * 320;
     particles.push({
       type: 'spark',
       x: x,
       y: y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 50,
-      size: 1.5 + Math.random() * 2.5,
-      life: 0.35 + Math.random() * 0.5,
-      maxLife: 0.85,
-      color: Math.random() < 0.4 ? '#ffffff' : (Math.random() < 0.5 ? '#ffee66' : '#ff8833'),
-      drag: 1.6,
+      vy: Math.sin(angle) * speed - 60,
+      size: 1.5 + Math.random() * 3,
+      life: 0.4 + Math.random() * 0.55,
+      maxLife: 0.95,
+      color: Math.random() < 0.45 ? '#ffffff' : (Math.random() < 0.5 ? '#ffee66' : '#ff8833'),
+      drag: 1.4,
     });
   }
 }
@@ -334,7 +386,10 @@ function updateSecondaryWeapons(dt) {
 
     if (def.type === 'heal') {
       // 医疗包：恢复生命
-      const heal = Math.round(baseDmg * def.damageMult);
+      // 急救强化：回复量 +50%/级
+      const mkLevel = player.secondaryAbilityLevels['mk_healboost'] || 0;
+      const healMult = def.damageMult * (1 + mkLevel * 0.5);
+      const heal = Math.round(baseDmg * healMult);
       player.hp = Math.min(player.maxHp, player.hp + heal);
       // 显示治疗数字（绿色）
       damageNumbers.push({
@@ -351,41 +406,50 @@ function updateSecondaryWeapons(dt) {
     }
 
     if (def.type === 'aoe_direct') {
-      // 榴弹炮：找最近敌人 → 目标标记 → 发射弹体 → 命中后爆炸
-      const target = findNearestEnemy(1e9);
-      if (!target) continue;
+      // 榴弹炮：找多个最近敌人 → 每颗弹体各自锁定 → 发射 → 命中爆炸
+      // 火力倾泻：每级额外发射一颗榴弹
+      const glLevel = player.secondaryAbilityLevels['gl_firepower'] || 0;
+      const shellCount = 1 + glLevel;
+      const targets = findNearestEnemies(shellCount, 1e9);
+      if (targets.length === 0) continue;
       const dmg = baseDmg * def.damageMult;
-      const tx = target.enemy.x;
-      const ty = target.enemy.y;
-      // 目标锁定指示（更长时间，给玩家看到"瞄准"）
-      createTargetMarker(tx, ty, def.aoeRadius, def.color);
-      // 发射弹体：从玩家飞向目标
-      const dx = tx - player.x;
-      const dy = ty - player.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const flyTime = Math.max(0.5, Math.min(2.0, dist / 300)); // 降低弹道速度，让拖尾和目标锁定更壮观
-      shells.push({
-        x: player.x,
-        y: player.y,
-        startX: player.x,
-        startY: player.y,
-        targetX: tx,
-        targetY: ty,
-        flyTime: flyTime,
-        flyElapsed: 0,
-        dmg: dmg,
-        aoeRadius: def.aoeRadius,
-        color: def.color,
-        exploded: false,
-        angle: Math.atan2(dy, dx), // 用于绘制方向
-      });
+      // 每颗弹体各自锁定最近的敌人
+      for (let i = 0; i < shellCount; i++) {
+        const tgt = targets[i] || targets[targets.length - 1]; // 不够多敌人时锁定同一目标
+        const tx = tgt.enemy.x;
+        const ty = tgt.enemy.y;
+        createTargetMarker(tx, ty, def.aoeRadius, def.color);
+        const dx = tx - player.x;
+        const dy = ty - player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const flyTime = Math.max(0.5, Math.min(2.0, dist / 300));
+        shells.push({
+          x: player.x,
+          y: player.y,
+          startX: player.x,
+          startY: player.y,
+          targetX: tx,
+          targetY: ty,
+          flyTime: flyTime,
+          flyElapsed: 0,
+          dmg: dmg,
+          aoeRadius: def.aoeRadius,
+          color: def.color,
+          exploded: false,
+          angle: Math.atan2(dy, dx),
+        });
+      }
       slot.cooldown = def.cooldown;
       continue;
     }
 
     if (def.type === 'aoe_delayed') {
-      // 手雷：向最近敌人位置投掷，5秒后爆炸
-      const target = findNearestEnemy(1e9);
+      // 手雷：向最近敌人位置投掷，2秒后爆炸
+      // 集束手雷：手雷伤害 +50%/级
+      const grLevel = player.secondaryAbilityLevels['gr_cluster'] || 0;
+      const dmgMult = def.damageMult * (1 + grLevel * 0.5);
+      const grenadeRange = 300;  // 手雷投掷范围
+      const target = findNearestEnemy(grenadeRange);
       if (!target) continue;
       const tx = target.enemy.x;
       const ty = target.enemy.y;
@@ -393,7 +457,7 @@ function updateSecondaryWeapons(dt) {
       const dx = tx - player.x;
       const dy = ty - player.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const flyTime = Math.max(0.6, Math.min(1.6, dist / 350));  // 距离/速度，约1秒
+      const flyTime = Math.max(0.5, Math.min(1.0, dist / 300));  // 近距离飞行更快
       grenades.push({
         x: player.x,
         y: player.y,
@@ -405,7 +469,7 @@ function updateSecondaryWeapons(dt) {
         flyElapsed: 0,
         fuseTime: def.fuseTime,
         fuseElapsed: 0,
-        dmg: baseDmg * def.damageMult,
+        dmg: baseDmg * dmgMult,
         aoeRadius: def.aoeRadius,
         color: def.color,
         exploding: false,
@@ -529,6 +593,25 @@ function updateSecondaryWeapons(dt) {
   }
   grenades = grenades.filter(g => !g.exploding);
 
+  // 屏幕震动衰减
+  if (screenShake.duration > 0) {
+    screenShake.elapsed += dt;
+    if (screenShake.elapsed >= screenShake.duration) {
+      screenShake.intensity = 0;
+      screenShake.duration = 0;
+      screenShake.elapsed = 0;
+    }
+  }
+  // 镜头闪光衰减
+  if (cameraFlash.duration > 0) {
+    cameraFlash.elapsed += dt;
+    if (cameraFlash.elapsed >= cameraFlash.duration) {
+      cameraFlash.intensity = 0;
+      cameraFlash.duration = 0;
+      cameraFlash.elapsed = 0;
+    }
+  }
+
   // 爆炸视觉衰减
   for (let ex of explosions) {
     ex.life -= dt;
@@ -646,9 +729,26 @@ function update(dt) {
 function pickRandomChoices(n) {
   const pool = ABILITY_POOL.slice();
   const result = [];
-  while (result.length < n && pool.length > 0) {
-    const idx = Math.floor(Math.random() * pool.length);
-    result.push(pool.splice(idx, 1)[0]);
+
+  // 副武器专属技能：持有对应武器时加入候选池
+  const secondaryChoices = [];
+  if (player) {
+    for (let slot of player.secondaryWeapons) {
+      const weaponId = slot.id;
+      const pool = SECONDARY_ABILITY_POOL[weaponId];
+      if (pool) {
+        for (let skill of pool) {
+          secondaryChoices.push({ ...skill, weaponId });
+        }
+      }
+    }
+  }
+
+  // 混合普通技能和副武器专属技能，统一打乱后取前 n 个
+  const fullPool = pool.concat(secondaryChoices);
+  while (result.length < n && fullPool.length > 0) {
+    const idx = Math.floor(Math.random() * fullPool.length);
+    result.push(fullPool.splice(idx, 1)[0]);
   }
   return result;
 }
@@ -845,29 +945,38 @@ function openLevelUpUi() {
   cards.style.cssText = 'display:flex;gap:18px;flex-wrap:wrap;justify-content:center;';
 
   levelUpChoices.forEach((choice) => {
+    const isSecondary = !!choice.weaponId;
+    const accentColor = isSecondary ? (choice.color || '#e67e22') : 'rgba(241,196,15,0.5)';
+    const nameColor = isSecondary ? (choice.color || '#e67e22') : '#f1c40f';
+    const tagText = isSecondary ? '[' + (SECONDARY_WEAPON_POOL[choice.weaponId]?.name || choice.weaponId) + '专属]' : '';
     const card = document.createElement('div');
     card.dataset.abilityId = choice.id;
-    card.style.cssText = 'width:200px;padding:20px 18px;border:2px solid rgba(241,196,15,0.5);border-radius:14px;background:rgba(26,26,46,0.85);cursor:pointer;transition:all 0.15s;text-align:center;';
+    card.style.cssText = 'width:200px;padding:20px 18px;border:2px solid ' + accentColor + ';border-radius:14px;background:rgba(26,26,46,0.85);cursor:pointer;transition:all 0.15s;text-align:center;';
     card.onmouseenter = () => {
       card.style.background = 'rgba(52,152,219,0.25)';
-      card.style.borderColor = '#f1c40f';
+      card.style.borderColor = nameColor;
       card.style.transform = 'translateY(-2px)';
     };
     card.onmouseleave = () => {
       card.style.background = 'rgba(26,26,46,0.85)';
-      card.style.borderColor = 'rgba(241,196,15,0.5)';
+      card.style.borderColor = accentColor;
       card.style.transform = 'translateY(0)';
     };
     card.onclick = () => onChooseAbility(choice.id);
 
+    const tag = document.createElement('div');
+    tag.textContent = tagText;
+    tag.style.cssText = 'font-size:10px;color:' + nameColor + ';margin-bottom:4px;opacity:0.8;';
+
     const name = document.createElement('div');
     name.textContent = choice.name;
-    name.style.cssText = 'font-size:18px;font-weight:bold;color:#f1c40f;margin-bottom:10px;';
+    name.style.cssText = 'font-size:18px;font-weight:bold;color:' + nameColor + ';margin-bottom:10px;';
 
     const desc = document.createElement('div');
     desc.textContent = choice.desc;
     desc.style.cssText = 'font-size:13px;color:#ddd;line-height:1.4;';
 
+    card.appendChild(tag);
     card.appendChild(name);
     card.appendChild(desc);
     cards.appendChild(card);
@@ -1080,7 +1189,7 @@ function gameLoop() {
   if (dt > 0.1) dt = 0.1;
 
   update(dt);
-  renderer.render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, shells, explosions, particles, targetMarkers);
+  renderer.render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, shells, explosions, particles, targetMarkers, screenShake, cameraFlash);
   minimap.render(player, enemies, player.x, player.y);
 
   requestAnimationFrame(gameLoop);

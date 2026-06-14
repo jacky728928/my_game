@@ -27,6 +27,8 @@ class Player {
     this.expMultiplier = 1;           // 经验获取倍率（开发者面板可调）
     // 副武器槽：最多 MAX_SECONDARY_WEAPONS 个
     this.secondaryWeapons = [];       // [{ id, cooldown, ...静态参数引用 }]
+    // 副武器专属技能等级
+    this.secondaryAbilityLevels = {}; // { weaponId: { abilityId: level } }
     // 朝向（弧度）
     this.angle = 0;
     // 受击闪光
@@ -129,6 +131,11 @@ class Player {
         break;
       case 'pickup_range':
         this.pickupRangeBonus += 5;
+        break;
+      default:
+        // 副武器专属技能：按完整 abilityId 累加等级（flat map，避免下划线拆分问题）
+        this.secondaryAbilityLevels[abilityId] =
+          (this.secondaryAbilityLevels[abilityId] || 0) + 1;
         break;
     }
   }

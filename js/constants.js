@@ -68,6 +68,19 @@ const ABILITY_POOL = [
   { id: 'pickup_range',  name: '灵力汲取', desc: '经验吸取范围 +5 px' },
 ];
 
+// 副武器专属技能池（需持有对应副武器才有概率抽到）
+const SECONDARY_ABILITY_POOL = {
+  grenade_launcher: [
+    { id: 'gl_firepower', name: '火力倾泻', desc: '榴弹数量 +1（每级额外发射一颗榴弹）', color: '#e67e22' },
+  ],
+  grenade: [
+    { id: 'gr_cluster', name: '集束手雷', desc: '手雷伤害 +50%/级（等级越高，爆炸越致命）', color: '#e74c3c' },
+  ],
+  medkit: [
+    { id: 'mk_healboost', name: '急救强化', desc: '医疗包回复量 +50%/级（持续强化治疗效率）', color: '#2ecc71' },
+  ],
+};
+
 // 伤害数字显示
 const DAMAGE_NUM_LIFE = 0.9;            // 数字存活秒数
 const DAMAGE_NUM_SPEED = 40;            // 上升速度（像素/秒）
@@ -90,11 +103,11 @@ const SECONDARY_WEAPON_POOL = {
   grenade: {
     id: 'grenade',
     name: '手雷',
-    desc: '10秒一发，自动丢向最近敌人脚下，5秒后爆炸，造成基础攻击×1500% 范围伤害（半径150px）',
+    desc: '10秒一发，自动丢向最近敌人脚下，2秒后爆炸，造成基础攻击×1500% 范围伤害（半径100px）',
     cooldown: 10.0,
     damageMult: 15.0,
-    aoeRadius: 150,
-    fuseTime: 5.0,
+    aoeRadius: 100,
+    fuseTime: 2.0,
     color: '#e74c3c',
     type: 'aoe_delayed',
   },

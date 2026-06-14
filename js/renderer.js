@@ -16,10 +16,18 @@ class Renderer {
     this.h = window.innerHeight;
   }
 
-  render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, shells, explosions, particles, targetMarkers) {
+  render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, shells, explosions, particles, targetMarkers, screenShake, cameraFlash) {
     const ctx = this.ctx;
-    const camX = player.x;
-    const camY = player.y;
+    // 屏幕震动偏移
+    let shakeX = 0, shakeY = 0;
+    if (screenShake && screenShake.duration > 0) {
+      const progress = screenShake.elapsed / screenShake.duration;
+      const damp = 1 - progress;
+      shakeX = (Math.random() - 0.5) * 2 * screenShake.intensity * damp;
+      shakeY = (Math.random() - 0.5) * 2 * screenShake.intensity * damp;
+    }
+    const camX = player.x + shakeX;
+    const camY = player.y + shakeY;
     const cx = this.w / 2;
     const cy = this.h / 2;
 
@@ -126,85 +134,132 @@ class Renderer {
         if (gx < -100 || gx > this.w + 100 || gy < -100 || gy > this.h + 100) continue;
 
         if (!g.landed) {
-          // 飞行中的手雷：大外圈发光 + 本体 + 高光
+          // 飞行中的手雷：椭圆旋转体 + 外发光 + 烟雾尾迹 + 高光
+          const spin = (g.flyElapsed * 8) % (Math.PI * 2);
           ctx.save();
-          // 外发光
+          // 大范围外发光
           ctx.shadowColor = g.color || '#e74c3c';
-          ctx.shadowBlur = 25;
+          ctx.shadowBlur = 30;
+          // 椭圆主体（随旋转缩放营造3D旋转感）
+          ctx.translate(gx, gy);
+          ctx.rotate(spin);
+          ctx.scale(1, 0.65);
           ctx.fillStyle = g.color || '#e74c3c';
           ctx.beginPath();
-          ctx.arc(gx, gy, 8, 0, Math.PI * 2);
+          ctx.arc(0, 0, 9, 0, Math.PI * 2);
           ctx.fill();
-          // 白色高光
+          // 高光面
+          ctx.scale(1 / 1, 1 / 0.65);
           ctx.shadowBlur = 0;
+          ctx.fillStyle = '#ff9988';
+          ctx.beginPath();
+          ctx.arc(-2, -2, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+          // 白色顶点高光
           ctx.fillStyle = '#ffffff';
           ctx.beginPath();
-          ctx.arc(gx - 2, gy - 2, 3, 0, Math.PI * 2);
+          ctx.arc(-3, -3, 2, 0, Math.PI * 2);
           ctx.fill();
-          // 深色描边
-          ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(gx, gy, 8, 0, Math.PI * 2);
-          ctx.stroke();
+          ctx.restore();
+
+          // 烟雾尾迹（每帧在当前位置后方画一团淡烟）
+          const dx = g.targetX - g.startX;
+          const dy = g.targetY - g.startY;
+          const dlen = Math.sqrt(dx * dx + dy * dy) || 1;
+          ctx.save();
+          // 多层烟雾，渐淡渐大
+          for (let t = 1; t <= 6; t++) {
+            const trailDist = t * 12;  // 尾迹间隔
+            const tx = gx - (dx / dlen) * trailDist;
+            const ty = gy - (dy / dlen) * trailDist;
+            ctx.globalAlpha = 0.25 - t * 0.035;
+            ctx.fillStyle = t < 3 ? '#ffaa66' : '#888888';
+            ctx.beginPath();
+            ctx.arc(tx, ty, 4 + t * 4, 0, Math.PI * 2);
+            ctx.fill();
+          }
           ctx.restore();
         } else {
-          // 落地后的手雷：急促闪烁 + 逐渐变密的AOE圈 + 倒计时
+          // 落地后的手雷：危险区呼吸灯 + 地面印记 + 急促闪烁 + 倒计时
           const fuseLeft = Math.max(0, g.fuseTime - g.fuseElapsed);
           const fuseProgress = g.fuseElapsed / g.fuseTime;
-          // 闪烁：越接近爆炸越频繁
-          const blinkFreq = 3 + fuseProgress * 20;
-          const blink = (Math.floor(g.fuseElapsed * blinkFreq) % 2 === 0) ? 1 : 0.35;
+          const blinkFreq = 3 + fuseProgress * 22;
+          const blink = (Math.floor(g.fuseElapsed * blinkFreq) % 2 === 0) ? 1 : 0.25;
           const intensity = 0.5 + fuseProgress * 0.5;
 
           ctx.save();
-          // 内圈高亮光晕（颜色从黄->红）
-          const coreColor = fuseProgress < 0.5 ? '#ffe066' : '#ff4422';
-          ctx.shadowColor = coreColor;
-          ctx.shadowBlur = 30 * intensity;
-          ctx.fillStyle = coreColor;
-          ctx.globalAlpha = blink;
+
+          // 地面投影阴影
+          ctx.globalAlpha = 0.3;
+          ctx.fillStyle = '#000000';
           ctx.beginPath();
-          ctx.arc(gx, gy, 6 + intensity * 4, 0, Math.PI * 2);
+          ctx.ellipse(gx, gy + 4, 12, 5, 0, 0, Math.PI * 2);
           ctx.fill();
 
-          // 深色内核
-          ctx.globalAlpha = 1;
-          ctx.shadowBlur = 0;
-          ctx.fillStyle = '#330000';
-          ctx.beginPath();
-          ctx.arc(gx, gy, 5, 0, Math.PI * 2);
-          ctx.fill();
-
-          // AOE 范围：多圈，越接近爆炸越亮越抖动
-          const pulse = Math.sin(g.fuseElapsed * 14) * 3;
-          ctx.globalAlpha = 0.25 + intensity * 0.35;
+          // 危险区外圈：呼吸灯 + 旋转弧线
+          const pulse = Math.sin(g.fuseElapsed * 16) * 3;
+          ctx.globalAlpha = 0.2 + intensity * 0.4;
           ctx.strokeStyle = g.color || '#e74c3c';
-          ctx.lineWidth = 2 + intensity * 2;
-          ctx.setLineDash([8, 6]);
+          ctx.lineWidth = 2 + intensity * 3;
+          ctx.setLineDash([10, 7]);
           ctx.beginPath();
           ctx.arc(gx, gy, g.aoeRadius + pulse, 0, Math.PI * 2);
           ctx.stroke();
-          // 内圈
-          ctx.setLineDash([]);
-          ctx.lineWidth = 1;
-          ctx.globalAlpha = 0.15 * intensity;
-          ctx.fillStyle = g.color || '#e74c3c';
+          // 旋转的虚线弧（让危险区更有动感）
+          ctx.setLineDash([4, 12]);
+          ctx.lineWidth = 1.5;
+          ctx.globalAlpha = 0.5 + Math.sin(g.fuseElapsed * 6) * 0.3;
+          ctx.strokeStyle = '#ff6644';
           ctx.beginPath();
-          ctx.arc(gx, gy, g.aoeRadius * 0.4, 0, Math.PI * 2);
+          ctx.arc(gx, gy, g.aoeRadius + pulse + 8, g.fuseElapsed * 2, g.fuseElapsed * 2 + Math.PI * 1.2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // 内圈填充（红色警示）
+          ctx.globalAlpha = 0.12 * intensity;
+          const innerGrd = ctx.createRadialGradient(gx, gy, 0, gx, gy, g.aoeRadius * 0.45);
+          innerGrd.addColorStop(0, '#ff3300');
+          innerGrd.addColorStop(1, 'rgba(255,50,0,0)');
+          ctx.fillStyle = innerGrd;
+          ctx.beginPath();
+          ctx.arc(gx, gy, g.aoeRadius * 0.45, 0, Math.PI * 2);
           ctx.fill();
 
-          // 引信倒计时数字（大字、描边）
+          // 手雷本体：急促闪烁核心
+          const coreColor = fuseProgress < 0.4 ? '#ffdd44' : fuseProgress < 0.7 ? '#ff8822' : '#ff2200';
           ctx.globalAlpha = 1;
-          ctx.fillStyle = '#ffffff';
+          ctx.shadowColor = coreColor;
+          ctx.shadowBlur = 40 * intensity;
+          ctx.fillStyle = coreColor;
+          ctx.globalAlpha = blink;
+          ctx.beginPath();
+          ctx.arc(gx, gy, 7 + intensity * 5, 0, Math.PI * 2);
+          ctx.fill();
+          // 深色内核
+          ctx.globalAlpha = 1;
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#220000';
+          ctx.beginPath();
+          ctx.arc(gx, gy, 5, 0, Math.PI * 2);
+          ctx.fill();
+          // 顶部白点（接近爆炸时变成红色）
+          ctx.fillStyle = fuseProgress > 0.7 ? '#ff0000' : '#ffffff';
+          ctx.beginPath();
+          ctx.arc(gx, gy - 4, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 引信倒计时大字（越接近爆炸越大越红）
+          const fontSize = 14 + intensity * 10;
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = fuseProgress > 0.7 ? '#ff0000' : '#ffffff';
           ctx.strokeStyle = '#000000';
           ctx.lineWidth = 3;
-          ctx.font = 'bold 16px Arial';
+          ctx.font = 'bold ' + fontSize + 'px Arial';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'bottom';
           const txt = fuseLeft.toFixed(1) + 's';
-          ctx.strokeText(txt, gx, gy - 14);
-          ctx.fillText(txt, gx, gy - 14);
+          ctx.strokeText(txt, gx, gy - 16);
+          ctx.fillText(txt, gx, gy - 16);
           ctx.restore();
         }
       }
@@ -294,6 +349,43 @@ class Renderer {
           ctx.beginPath();
           ctx.arc(ex2, ey2, ex.radius, 0, Math.PI * 2);
           ctx.stroke();
+          ctx.restore();
+        } else if (ex.type === 'flash') {
+          // 中心白色强光：从小到大然后消失，带发光
+          ctx.save();
+          ctx.shadowColor = '#ffffff';
+          ctx.shadowBlur = 60 * alpha;
+          const grd = ctx.createRadialGradient(ex2, ey2, 0, ex2, ey2, ex.radius);
+          grd.addColorStop(0, `rgba(255,255,255,${alpha})`);
+          grd.addColorStop(0.4, `rgba(255,240,200,${alpha * 0.7})`);
+          grd.addColorStop(1, `rgba(255,180,80,0)`);
+          ctx.fillStyle = grd;
+          ctx.beginPath();
+          ctx.arc(ex2, ey2, ex.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        } else if (ex.type === 'ring_inner') {
+          // 内层暗红脉冲：收缩消失
+          ctx.save();
+          ctx.strokeStyle = ex.color;
+          ctx.lineWidth = 6 * alpha + 2;
+          ctx.globalAlpha = alpha * 0.8;
+          ctx.beginPath();
+          ctx.arc(ex2, ey2, ex.radius * alpha, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        } else if (ex.type === 'scorch') {
+          // 地面烧焦印记：暗色圆斑，久久不散
+          ctx.save();
+          ctx.globalAlpha = alpha * 0.55;
+          const grd = ctx.createRadialGradient(ex2, ey2, 0, ex2, ey2, ex.radius);
+          grd.addColorStop(0, 'rgba(15,5,0,0.8)');
+          grd.addColorStop(0.6, 'rgba(30,10,0,0.5)');
+          grd.addColorStop(1, 'rgba(40,15,0,0)');
+          ctx.fillStyle = grd;
+          ctx.beginPath();
+          ctx.arc(ex2, ey2, ex.radius, 0, Math.PI * 2);
+          ctx.fill();
           ctx.restore();
         } else {
           // 默认兼容（简单圆环）
@@ -613,6 +705,14 @@ class Renderer {
       ctx.fillStyle = '#fff';
       ctx.font = '20px Arial';
       ctx.fillText('点击重新开始', cx, cy + 30);
+    }
+
+    // 镜头闪光叠加层（全屏白闪效果）
+    if (cameraFlash && cameraFlash.duration > 0) {
+      const progress = cameraFlash.elapsed / cameraFlash.duration;
+      const alpha = cameraFlash.intensity * (1 - progress);
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.fillRect(0, 0, this.w, this.h);
     }
   }
 }
