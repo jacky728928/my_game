@@ -26,6 +26,8 @@ let levelUpChoices = null;   // 当前三选一选项
 let levelUpUi = null;         // UI 元素引用
 let screenShake = { intensity: 0, duration: 0, elapsed: 0 };  // 屏幕震动
 let cameraFlash = { intensity: 0, duration: 0, elapsed: 0 };  // 镜头闪光
+// 主动技能充能状态：玩家按住 E 或按住技能图标期间为 true，松开后释放
+let _activeSkillCharging = false;  // 是否处于"按住瞄准"状态（仅闪烁突袭有效）
 
 function init() {
   player = new Player();
@@ -43,7 +45,8 @@ function init() {
   gameOver = false;
   gamePaused = false;
   closeLevelUpUi();
-  // 开局先选模式（手机/电脑），手机视野+50%；选完再选副武器
+  ensureActiveSkillIcon();
+  // 开局先选模式（手机/电脑），手机视野+50%；然后选副武器；最后选主动技能
   openModeSelectUi();
 }
 
@@ -76,8 +79,9 @@ function openModeSelectUi() {
   mobileCard.onclick = () => {
     player.viewRangeBonus += 50;  // 手机模式：视野 +50%
     closeLevelUpUi();
-    // 进入副武器选择
+    // 进入副武器选择 → 主动技能选择
     player.pendingLevelUps.push({ level: 1, type: 'secondary' });
+    player.pendingLevelUps.push({ level: 1, type: 'active' });
     triggerLevelUpUi();
   };
   const mobileName = document.createElement('div');
@@ -97,8 +101,9 @@ function openModeSelectUi() {
   pcCard.onmouseleave = () => { pcCard.style.transform = 'translateY(0)'; pcCard.style.boxShadow = 'none'; };
   pcCard.onclick = () => {
     closeLevelUpUi();
-    // 进入副武器选择
+    // 进入副武器选择 → 主动技能选择
     player.pendingLevelUps.push({ level: 1, type: 'secondary' });
+    player.pendingLevelUps.push({ level: 1, type: 'active' });
     triggerLevelUpUi();
   };
   const pcName = document.createElement('div');
@@ -767,6 +772,10 @@ function triggerLevelUpUi() {
     // 弹出副武器选择：列出所有副武器（当前已装备的禁止重复）
     levelUpChoices = SECONDARY_WEAPON_LIST.map(w => ({ ...w }));
     openSecondaryWeaponUi();
+  } else if (pending && pending.type === 'active') {
+    // 弹出主动技能选择
+    levelUpChoices = ACTIVE_SKILL_LIST.map(s => ({ ...s }));
+    openActiveSkillUi();
   } else {
     levelUpChoices = pickRandomChoices(3);
     openLevelUpUi();
@@ -790,6 +799,334 @@ function onChooseSecondaryWeapon(weaponId) {
     openDiscardUi(weaponId);
   }
 }
+
+// === 主动技能选择界面（开局弹出，玩家从3个主动技能中选一个）
+function openActiveSkillUi() {
+  const choices = levelUpChoices;
+  closeLevelUpUi();
+  levelUpChoices = choices;
+  const container = document.createElement('div');
+  container.id = 'levelUpUi';
+  container.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;color:#fff;user-select:none;';
+
+  const title = document.createElement('div');
+  title.textContent = '✹ 选择你的主动技能 ✹';
+  title.style.cssText = 'font-size:26px;font-weight:bold;margin-bottom:22px;color:#f1c40f;text-shadow:0 2px 8px rgba(0,0,0,0.6);';
+  container.appendChild(title);
+
+  const info = document.createElement('div');
+  info.textContent = '电脑按 E 键释放 / 手机点击右下角图标释放';
+  info.style.cssText = 'font-size:13px;color:#aaa;margin-bottom:18px;';
+  container.appendChild(info);
+
+  const cards = document.createElement('div');
+  cards.style.cssText = 'display:flex;gap:18px;flex-wrap:wrap;justify-content:center;';
+
+  levelUpChoices.forEach((choice) => {
+    const card = document.createElement('div');
+    const color = choice.color || '#f1c40f';
+    card.style.cssText = 'width:220px;padding:22px 18px;border:2px solid ' + color + ';border-radius:14px;background:rgba(26,26,46,0.85);cursor:pointer;transition:all 0.15s;text-align:center;';
+    card.onmouseenter = () => { card.style.transform = 'translateY(-3px)'; card.style.boxShadow = '0 6px 16px rgba(0,0,0,0.5)'; };
+    card.onmouseleave = () => { card.style.transform = 'translateY(0)'; card.style.boxShadow = 'none'; };
+    card.onclick = () => onChooseActiveSkill(choice.id);
+
+    const name = document.createElement('div');
+    name.textContent = choice.icon + '  ' + choice.name;
+    name.style.cssText = 'font-size:18px;font-weight:bold;color:' + color + ';margin-bottom:10px;';
+
+    const desc = document.createElement('div');
+    desc.textContent = choice.desc;
+    desc.style.cssText = 'font-size:12px;color:#ddd;line-height:1.4;';
+
+    const cd = document.createElement('div');
+    cd.textContent = '冷却 ' + choice.cooldown + ' 秒';
+    cd.style.cssText = 'font-size:11px;color:#888;margin-top:8px;';
+
+    card.appendChild(name);
+    card.appendChild(desc);
+    card.appendChild(cd);
+    cards.appendChild(card);
+  });
+  container.appendChild(cards);
+  document.body.appendChild(container);
+  levelUpUi = container;
+}
+
+function onChooseActiveSkill(skillId) {
+  player.equipActiveSkill(skillId);
+  player.pendingLevelUps.shift();
+  closeLevelUpUi();
+  if (player.pendingLevelUps.length > 0) {
+    setTimeout(() => triggerLevelUpUi(), 80);
+  } else {
+    gamePaused = false;
+  }
+}
+
+// === 主动技能：计算当前释放方向（归一化；不动则按朝向）
+function _getActiveSkillDirection() {
+  const [ix, iy] = input.getDirection();
+  let dx = ix, dy = iy;
+  const mag = Math.sqrt(dx * dx + dy * dy);
+  if (mag < 0.1) {
+    dx = Math.cos(player.angle || 0);
+    dy = Math.sin(player.angle || 0);
+  } else {
+    dx = dx / mag;
+    dy = dy / mag;
+  }
+  return [dx, dy];
+}
+
+// === 主动技能：计算闪烁突袭的落点（用于预览绘制）
+// 返回 { x, y, aoeRadius, color } 或 null
+function getActiveSkillPreview() {
+  if (!_activeSkillCharging) return null;
+  if (!player || !player.alive) return null;
+  if (!player.activeSkillId) return null;
+  const def = ACTIVE_SKILL_POOL[player.activeSkillId];
+  if (!def) return null;
+  if (def.id !== 'blink') return null; // 仅闪烁突袭显示落点预览
+  const [dx, dy] = _getActiveSkillDirection();
+  const newX = Math.max(player.radius, Math.min(WORLD_W - player.radius, player.x + dx * def.blinkDist));
+  const newY = Math.max(player.radius, Math.min(WORLD_H - player.radius, player.y + dy * def.blinkDist));
+  return { x: newX, y: newY, aoeRadius: def.aoeRadius, color: def.color, fromX: player.x, fromY: player.y };
+}
+
+// === 主动技能：判断技能能否释放（存活/非暂停/有技能/冷却就绪）
+function _canReleaseActiveSkill() {
+  if (!player || !player.alive) return false;
+  if (gamePaused || gameOver) return false;
+  if (!player.activeSkillId) return false;
+  if (player.activeSkillCooldown > 0) return false;
+  return !!ACTIVE_SKILL_POOL[player.activeSkillId];
+}
+
+// === 主动技能：真正执行释放（由"松开"事件调用）
+function releaseActiveSkillNow() {
+  if (!_canReleaseActiveSkill()) return;
+  const def = ACTIVE_SKILL_POOL[player.activeSkillId];
+  const [dx, dy] = _getActiveSkillDirection();
+
+  if (def.id === 'blink') {
+    // 闪烁突袭：瞬间移动 + 落地 AOE
+    const dist = def.blinkDist;
+    const newX = Math.max(player.radius, Math.min(WORLD_W - player.radius, player.x + dx * dist));
+    const newY = Math.max(player.radius, Math.min(WORLD_H - player.radius, player.y + dy * dist));
+    // 记录起地位置（用于起地特效）
+    const oldX = player.x;
+    const oldY = player.y;
+    player.x = newX;
+    player.y = newY;
+    // 落地后短暂霸体，防止和敌人重叠时被碰撞扣血
+    player.startInvuln(0.2);
+
+    // 视觉范围统一用扩大后的 aoeR
+    const aoeR = def.aoeRadius * 3; // 测试用扩大3倍，正式上线改回 def.aoeRadius
+
+    // === 起地特效（玩家原来位置喷一波紫光）===
+    explosions.push({ x: oldX, y: oldY, radius: 0, maxRadius: aoeR * 0.8, life: 0.25, maxLife: 0.25, color: '#9b59b6', type: 'ring_main' });
+    explosions.push({ x: oldX, y: oldY, radius: 0, maxRadius: aoeR * 1.4, life: 0.4, maxLife: 0.4, color: '#bb66ff', type: 'ring_outer' });
+    for (let i = 0; i < 20; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 80 + Math.random() * 160;
+      particles.push({ x: oldX, y: oldY, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.45, maxLife: 0.45, color: '#9b59b6', radius: 3 });
+    }
+
+    // === 落地特效（更猛、更显眼）===
+    // 白色强光闪光
+    explosions.push({ x: newX, y: newY, radius: 0, maxRadius: aoeR * 2.0, life: 0.25, maxLife: 0.25, color: '#ffffff', type: 'flash' });
+    // 主紫环（粗）
+    explosions.push({ x: newX, y: newY, radius: 0, maxRadius: aoeR * 1.6, life: 0.4, maxLife: 0.4, color: '#9b59b6', type: 'ring_main' });
+    // 白色内光环
+    explosions.push({ x: newX, y: newY, radius: 0, maxRadius: aoeR * 1.2, life: 0.3, maxLife: 0.3, color: '#ffffff', type: 'ring_white' });
+    // 外圈扩散（淡紫）
+    explosions.push({ x: newX, y: newY, radius: 0, maxRadius: aoeR * 2.2, life: 0.55, maxLife: 0.55, color: '#bb66ff', type: 'ring_outer' });
+    // 内层脉冲
+    explosions.push({ x: newX, y: newY, radius: 0, maxRadius: aoeR * 1.0, life: 0.35, maxLife: 0.35, color: '#d9b3ff', type: 'ring_inner' });
+    // 烧焦印记（地面残留，让范围更明显）
+    explosions.push({ x: newX, y: newY, radius: 0, maxRadius: aoeR * 1.2, life: 1.4, maxLife: 1.4, color: '#3d1f5c', type: 'scorch' });
+
+    // 粒子：数量更多、分两批（一圈水平散射 + 一圈上抛）
+    for (let i = 0; i < 28; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 140 + Math.random() * 220;
+      particles.push({ x: newX, y: newY, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.55, maxLife: 0.55, color: '#bb66ff', radius: 4 });
+    }
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 60 + Math.random() * 80;
+      particles.push({ x: newX, y: newY, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 60, life: 0.7, maxLife: 0.7, color: '#ffffff', radius: 3 });
+    }
+    for (let i = 0; i < 12; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 200 + Math.random() * 180;
+      particles.push({ x: newX, y: newY, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.4, maxLife: 0.4, color: '#ffccff', radius: 2 });
+    }
+
+    // AOE 伤害（使用扩大后的 aoeR）
+    const dmg = player.effectiveDamage * 2.0;
+    for (let e of enemies) {
+      if (!e.alive) continue;
+      const edx = e.x - newX;
+      const edy = e.y - newY;
+      const d2 = Math.sqrt(edx * edx + edy * edy);
+      if (d2 <= aoeR + e.radius) {
+        e.takeDamage(dmg);
+        addDamageNumber(e.x, e.y, dmg, true);
+      }
+    }
+    // 更强的屏幕震动 + 镜头闪光
+    screenShake.intensity = 14;
+    screenShake.duration = 0.35;
+    screenShake.elapsed = 0;
+    cameraFlash.intensity = 0.25;
+    cameraFlash.duration = 0.18;
+    cameraFlash.elapsed = 0;
+  } else if (def.id === 'dash') {
+    // 冲刺翻滚：快速位移 + 霸体（保持按下即释放的简单逻辑）
+    const dist = def.dashDist;
+    const dashSteps = 6;
+    const stepDist = dist / dashSteps;
+    for (let i = 1; i <= dashSteps; i++) {
+      player.x += dx * stepDist;
+      player.y += dy * stepDist;
+      player.x = Math.max(player.radius, Math.min(WORLD_W - player.radius, player.x));
+      player.y = Math.max(player.radius, Math.min(WORLD_H - player.radius, player.y));
+      particles.push({ x: player.x, y: player.y, vx: 0, vy: 0, life: 0.4, maxLife: 0.4, color: '#3498db', radius: 5 });
+    }
+    player.startInvuln(def.invulnTime);
+  } else if (def.id === 'haste') {
+    // 疾跑：移速 buff
+    player.activeSkillBuff = {
+      id: 'haste',
+      timeLeft: def.duration,
+      speedMult: def.speedMult,
+    };
+  }
+
+  player.releaseActiveSkill(); // 扣冷却
+}
+
+// === 主动技能："按下"事件 -> 进入充能瞄准（闪烁突袭）或直接释放（其他技能）
+function onActiveSkillPress() {
+  if (!_canReleaseActiveSkill()) return;
+  const def = ACTIVE_SKILL_POOL[player.activeSkillId];
+  if (def.id === 'blink') {
+    _activeSkillCharging = true;
+  } else {
+    // 非闪烁技能：按下即释放
+    releaseActiveSkillNow();
+  }
+}
+
+// === 主动技能："松开"事件 -> 若为充能状态则释放
+function onActiveSkillRelease() {
+  if (_activeSkillCharging) {
+    _activeSkillCharging = false;
+    releaseActiveSkillNow();
+  }
+}
+
+// 向后兼容：保留原 triggerActiveSkill 入口（供其他引用处调用）
+function triggerActiveSkill() {
+  releaseActiveSkillNow();
+}
+
+// === 主动技能图标 DOM（右下角圆形按钮，显示冷却环）
+// 我们混合使用：DOM 用于点击，canvas renderer 内画视觉
+let _activeSkillDomIcon = null;
+
+function ensureActiveSkillIcon() {
+  // 清理旧的
+  if (_activeSkillDomIcon && _activeSkillDomIcon.parentNode) {
+    _activeSkillDomIcon.parentNode.removeChild(_activeSkillDomIcon);
+  }
+  const el = document.createElement('div');
+  el.id = 'activeSkillIcon';
+  el.style.cssText = 'position:fixed;right:20px;bottom:20px;width:70px;height:70px;border-radius:50%;background:rgba(26,26,46,0.7);border:2px solid #666;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;color:#888;font-size:14px;user-select:none;z-index:100;pointer-events:none;touch-action:none;-webkit-user-select:none;';
+  el.textContent = '技能';
+  // 手机/电脑通用：按下进入充能瞄准，松开释放
+  el.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    onActiveSkillPress();
+  });
+  el.addEventListener('pointerup', (ev) => {
+    ev.preventDefault();
+    onActiveSkillRelease();
+  });
+  el.addEventListener('pointercancel', (ev) => {
+    ev.preventDefault();
+    onActiveSkillRelease();
+  });
+  el.addEventListener('pointerleave', (ev) => {
+    // 鼠标移出图标时不取消（允许手指在屏幕上拖动移动角色）
+    // 仅在 pointerup 时释放，避免误操作
+  });
+  document.body.appendChild(el);
+  _activeSkillDomIcon = el;
+  _updateSkillIconVisual();
+}
+
+function _updateSkillIconVisual() {
+  if (!_activeSkillDomIcon) return;
+  if (!player || !player.activeSkillId) {
+    _activeSkillDomIcon.textContent = '技能';
+    _activeSkillDomIcon.style.border = '2px solid #666';
+    _activeSkillDomIcon.style.color = '#888';
+    return;
+  }
+  const def = ACTIVE_SKILL_POOL[player.activeSkillId];
+  const ready = player.activeSkillCooldown <= 0;
+  _activeSkillDomIcon.style.borderColor = def.color;
+  if (_activeSkillCharging && ready && def.id === 'blink') {
+    // 闪烁突袭瞄准中：呼吸发光 + 文案提示
+    const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 150);
+    _activeSkillDomIcon.style.boxShadow = '0 0 ' + (12 + 6 * pulse) + 'px ' + hexToRgba(def.color, 0.9) + ', inset 0 0 ' + (8 + 4 * pulse) + 'px ' + hexToRgba(def.color, 0.5);
+    _activeSkillDomIcon.style.background = 'radial-gradient(circle, ' + hexToRgba(def.color, 0.3) + ' 0%, ' + hexToRgba(def.color, 0.15) + ' 80%, rgba(0,0,0,0) 100%)';
+    _activeSkillDomIcon.style.color = '#fff';
+    _activeSkillDomIcon.innerHTML = '<div style="text-align:center;line-height:1.1;"><div style="font-size:22px;font-weight:bold;">' + def.icon + '</div><div style="font-size:9px;opacity:0.9;">瞄准中·松开释放</div></div>';
+    _activeSkillDomIcon.style.pointerEvents = 'auto';
+  } else if (ready) {
+    _activeSkillDomIcon.style.boxShadow = 'none';
+    _activeSkillDomIcon.style.background = 'radial-gradient(circle, rgba(40,40,70,0.85) 0%, ' + hexToRgba(def.color, 0.25) + ' 80%, rgba(0,0,0,0) 100%)';
+    _activeSkillDomIcon.style.color = '#fff';
+    _activeSkillDomIcon.innerHTML = '<div style="text-align:center;line-height:1.1;"><div style="font-size:22px;font-weight:bold;">' + def.icon + '</div><div style="font-size:10px;opacity:0.85;">按 E / 点击</div></div>';
+    _activeSkillDomIcon.style.pointerEvents = 'auto';
+  } else {
+    const pct = player.activeSkillCooldown / def.cooldown;
+    _activeSkillDomIcon.style.boxShadow = 'none';
+    _activeSkillDomIcon.style.background = 'conic-gradient(#444 ' + (pct * 360) + 'deg, ' + def.color + ' 0deg, rgba(40,40,70,0.85) 0deg)';
+    _activeSkillDomIcon.style.color = '#bbb';
+    _activeSkillDomIcon.innerHTML = '<div style="text-align:center;line-height:1.1;"><div style="font-size:22px;font-weight:bold;">' + def.icon + '</div><div style="font-size:11px;">' + player.activeSkillCooldown.toFixed(1) + 's</div></div>';
+    _activeSkillDomIcon.style.pointerEvents = 'auto';
+  }
+}
+
+function hexToRgba(hex, alpha) {
+  // hex like #9b59b6
+  if (!hex || hex.length < 7) return 'rgba(155,89,182,' + alpha + ')';
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+// === 按键 / 点击触发
+// E 键：按下 -> 进入充能瞄准（闪烁突袭）/直接释放（其他技能）；松开 -> 释放闪烁突袭
+// 开发者面板 D 键（已存在）
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'e' || e.key === 'E') {
+    // 防止按住时浏览器的重复 keydown 重复进入
+    if (e.repeat) return;
+    onActiveSkillPress();
+  }
+});
+document.addEventListener('keyup', (e) => {
+  if (e.key === 'e' || e.key === 'E') {
+    onActiveSkillRelease();
+  }
+});
 
 // 打开丢弃界面（在“武器超过3个时”使用）
 function openDiscardUi(newWeaponId) {
@@ -1191,6 +1528,7 @@ function gameLoop() {
   update(dt);
   renderer.render(player, enemies, bullets, xpOrbs, damageNumbers, grenades, shells, explosions, particles, targetMarkers, screenShake, cameraFlash);
   minimap.render(player, enemies, player.x, player.y);
+  _updateSkillIconVisual();
 
   requestAnimationFrame(gameLoop);
 }

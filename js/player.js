@@ -29,6 +29,10 @@ class Player {
     this.secondaryWeapons = [];       // [{ id, cooldown, ...静态参数引用 }]
     // 副武器专属技能等级
     this.secondaryAbilityLevels = {}; // { weaponId: { abilityId: level } }
+    // 主动技能
+    this.activeSkillId = null;         // 已装备的主动技能 id
+    this.activeSkillCooldown = 0;      // 冷却剩余（秒）
+    this.activeSkillBuff = null;       // 当前 buff：{ id, timeLeft, speedMult }
     // 朝向（弧度）
     this.angle = 0;
     // 受击闪光
@@ -51,14 +55,37 @@ class Player {
 
   update(dt, bullets) {
     if (!this.alive) return;
+    // 计算实际速度（带疾跑加成）
+    let curSpeed = this.speed;
+    if (this.activeSkillBuff && this.activeSkillBuff.id === 'haste' && this.activeSkillBuff.timeLeft > 0) {
+      curSpeed = this.speed * this.activeSkillBuff.speedMult;
+    }
     this.x += this.vx * dt;
     this.y += this.vy * dt;
+    // 限制 vx/vy 用 curSpeed 的倍率 — 重新设置为当前输入方向 × 实际速度
+    // （外层 setVelocity 使用 this.speed 作为基准，这里二次调整）
+    if (Math.abs(this.vx) > 1 || Math.abs(this.vy) > 1) {
+      const vMag = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+      if (vMag > 0) {
+        this.vx = this.vx / vMag * curSpeed;
+        this.vy = this.vy / vMag * curSpeed;
+      }
+    }
     this.x = Math.max(this.radius, Math.min(WORLD_W - this.radius, this.x));
     this.y = Math.max(this.radius, Math.min(WORLD_H - this.radius, this.y));
     if (Math.abs(this.vx) > 1 || Math.abs(this.vy) > 1) {
       this.angle = Math.atan2(this.vy, this.vx);
     }
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+    this.activeSkillCooldown = Math.max(0, this.activeSkillCooldown - dt);
+    if (this.activeSkillBuff) {
+      this.activeSkillBuff.timeLeft -= dt;
+      if (this.activeSkillBuff.timeLeft <= 0) this.activeSkillBuff = null;
+    }
+    if (this._invulnTimeLeft && this._invulnTimeLeft > 0) {
+      this._invulnTimeLeft -= dt;
+      if (this._invulnTimeLeft <= 0) this._invulnTimeLeft = 0;
+    }
     this.damageFlash = Math.max(0, this.damageFlash - dt);
     this.vx = 0;
     this.vy = 0;
@@ -100,6 +127,7 @@ class Player {
   }
 
   takeDamage(dmg) {
+    if (this.isInvulnerable()) return;
     this.hp = Math.max(0, this.hp - dmg);
     this.damageFlash = DAMAGE_FLASH_DURATION;
     if (this.hp <= 0) {
@@ -169,5 +197,34 @@ class Player {
   // 副武器：丢弃
   discardSecondaryWeapon(id) {
     this.secondaryWeapons = this.secondaryWeapons.filter(w => w.id !== id);
+  }
+
+  // 主动技能：装备
+  equipActiveSkill(id) {
+    if (!ACTIVE_SKILL_POOL[id]) return;
+    this.activeSkillId = id;
+    this.activeSkillCooldown = 0;
+    this.activeSkillBuff = null;
+  }
+
+  // 主动技能：释放（返回是否成功释放，调用方处理具体效果）
+  releaseActiveSkill() {
+    if (!this.activeSkillId) return false;
+    if (this.activeSkillCooldown > 0) return false;
+    const def = ACTIVE_SKILL_POOL[this.activeSkillId];
+    if (!def) return false;
+    this.activeSkillCooldown = def.cooldown;
+    return true;
+  }
+
+  // 是否处于免伤/霸体状态
+  isInvulnerable() {
+    if (this._invulnTimeLeft && this._invulnTimeLeft > 0) return true;
+    return false;
+  }
+
+  // 开启霸体（冲刺翻滚用）
+  startInvuln(seconds) {
+    this._invulnTimeLeft = seconds;
   }
 }

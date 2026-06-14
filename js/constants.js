@@ -128,3 +128,45 @@ const SECONDARY_WEAPON_LIST = [
   SECONDARY_WEAPON_POOL.grenade,
   SECONDARY_WEAPON_POOL.medkit,
 ];
+
+// ========== 主动技能系统 ==========
+// 开局从3个技能中随机3选1
+// 触发方式：手机点击右下角图标 / 电脑按 E 键
+const ACTIVE_SKILL_POOL = {
+  blink: {
+    id: 'blink',
+    name: '闪烁突袭',
+    desc: '瞬间向移动方向瞬移 300px，落地对半径 50px 敌人造成伤害',
+    cooldown: 10.0,
+    blinkDist: 300,
+    aoeRadius: 50,
+    color: '#9b59b6',
+    icon: '✦',
+  },
+  dash: {
+    id: 'dash',
+    name: '冲刺翻滚',
+    desc: '向摇杆方向快速冲刺 200px，期间霸体（免伤）0.3 秒',
+    cooldown: 3.0,
+    dashDist: 200,
+    invulnTime: 0.3,
+    color: '#3498db',
+    icon: '➤',
+  },
+  haste: {
+    id: 'haste',
+    name: '疾跑',
+    desc: '移速提升，持续 5 秒',
+    cooldown: 5.0,
+    duration: 5.0,
+    speedMult: 1.6,
+    color: '#2ecc71',
+    icon: '»',
+  },
+};
+
+const ACTIVE_SKILL_LIST = [
+  ACTIVE_SKILL_POOL.blink,
+  ACTIVE_SKILL_POOL.dash,
+  ACTIVE_SKILL_POOL.haste,
+];

@@ -563,6 +563,70 @@ class Renderer {
                cy + Math.sin(player.angle) * (player.radius + 10));
     ctx.stroke();
 
+    // 主动技能：闪烁突袭落点预览
+    if (typeof getActiveSkillPreview === 'function') {
+      const pv = getActiveSkillPreview();
+      if (pv) {
+        const tx = pv.x - camX + cx;
+        const ty = pv.y - camY + cy;
+        const color = pv.color || '#9b59b6';
+        const now2 = performance.now() / 1000;
+        const pulse = 0.6 + 0.4 * Math.sin(now2 * 6);
+        ctx.save();
+        // 玩家到落点的虚线
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.45;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
+        ctx.lineDashOffset = -now2 * 40;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(tx, ty);
+        ctx.stroke();
+        // 落点处的 AOE 虚线圆（呼吸）
+        ctx.globalAlpha = 0.55 + pulse * 0.35;
+        ctx.lineWidth = 2 + pulse * 1.5;
+        ctx.setLineDash([10, 6]);
+        ctx.beginPath();
+        ctx.arc(tx, ty, pv.aoeRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        // 落点处的浅色填充（更有范围感）
+        ctx.globalAlpha = 0.15 + pulse * 0.12;
+        const grd = ctx.createRadialGradient(tx, ty, 0, tx, ty, pv.aoeRadius);
+        grd.addColorStop(0, color);
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(tx, ty, pv.aoeRadius, 0, Math.PI * 2);
+        ctx.fill();
+        // 落点中心十字准星
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        const cLen = 8;
+        ctx.beginPath();
+        ctx.moveTo(tx - cLen, ty);
+        ctx.lineTo(tx - 2, ty);
+        ctx.moveTo(tx + 2, ty);
+        ctx.lineTo(tx + cLen, ty);
+        ctx.moveTo(tx, ty - cLen);
+        ctx.lineTo(tx, ty - 2);
+        ctx.moveTo(tx, ty + 2);
+        ctx.lineTo(tx, ty + cLen);
+        ctx.stroke();
+        // 落点中心小圆点（颜色对应技能）
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+    }
+
     // 恢复视野缩放（此后为 UI 正常大小）
     if (savedScale) ctx.restore();
 
