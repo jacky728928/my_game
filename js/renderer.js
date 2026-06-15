@@ -470,6 +470,180 @@ class Renderer {
       }
     }
 
+    // 轨道炮瞄准准星（天基屠龙炮蓄力阶段）
+    if (typeof orbitalCharges !== 'undefined' && orbitalCharges.length > 0) {
+      for (let c of orbitalCharges) {
+        if (c.phase !== 'charging') continue;
+        const mx = c.targetX - camX + cx;
+        const my = c.targetY - camY + cy;
+        const progress = Math.min(1, c.chargeTime / c.maxChargeTime);
+        const alpha = 0.7 + progress * 0.3;
+        const now3 = performance.now() / 1000;
+        const pulse = 0.6 + 0.4 * Math.sin(now3 * 10);
+
+        ctx.save();
+
+        // 屏幕边缘红色警告闪烁
+        const warnAlpha = (0.15 + progress * 0.15) * (0.5 + 0.5 * Math.sin(now3 * 8));
+        ctx.fillStyle = `rgba(0,100,200,${warnAlpha})`;
+        ctx.fillRect(0, 0, this.w, this.h);
+
+        // 第1层：外圈大虚线圆（缓慢收缩）
+        const outerR = c.aoeRadius * (1.6 - progress * 0.6);
+        ctx.strokeStyle = c.color || '#00d4ff';
+        ctx.lineWidth = 4;
+        ctx.globalAlpha = alpha * 0.7;
+        ctx.setLineDash([15, 10]);
+        ctx.lineDashOffset = now3 * 40;
+        ctx.shadowColor = c.color || '#00d4ff';
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(mx, my, outerR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 第2层：主准星圆
+        const mainR = c.aoeRadius * (1.3 - progress * 0.3);
+        ctx.setLineDash([10, 6]);
+        ctx.lineDashOffset = -now3 * 60;
+        ctx.lineWidth = 5 + pulse * 3;
+        ctx.strokeStyle = c.color || '#00d4ff';
+        ctx.globalAlpha = alpha;
+        ctx.shadowBlur = 25;
+        ctx.beginPath();
+        ctx.arc(mx, my, mainR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 第3层：内圈
+        const innerR = c.aoeRadius * (1.0 - progress * 0.4);
+        ctx.setLineDash([5, 4]);
+        ctx.lineDashOffset = now3 * 80;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(mx, my, innerR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+
+        // 充能进度填充
+        const gradR = c.aoeRadius * (1.4 - progress * 0.4);
+        const grd = ctx.createRadialGradient(mx, my, innerR * 0.2, mx, my, gradR);
+        grd.addColorStop(0, `rgba(0,220,255,${0.4 * progress})`);
+        grd.addColorStop(0.4, `rgba(0,150,255,${0.25 * progress})`);
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grd;
+        ctx.globalAlpha = alpha * 0.8;
+        ctx.beginPath();
+        ctx.arc(mx, my, gradR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 4个旋转的角标
+        const cornerR = mainR;
+        const cornerLen = 25 + progress * 15;
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = c.color || '#00d4ff';
+        ctx.globalAlpha = alpha;
+        ctx.shadowBlur = 20;
+        const rotOffset = now3 * 3;
+        for (let i = 0; i < 4; i++) {
+          const baseAngle = (i / 4) * Math.PI * 2 + rotOffset;
+          const cxx = mx + Math.cos(baseAngle) * cornerR;
+          const cyy = my + Math.sin(baseAngle) * cornerR;
+          ctx.beginPath();
+          ctx.moveTo(cxx + Math.cos(baseAngle) * cornerLen, cyy + Math.sin(baseAngle) * cornerLen);
+          ctx.lineTo(cxx, cyy);
+          ctx.lineTo(cxx + Math.cos(baseAngle + Math.PI / 2) * (cornerLen * 0.6), cyy + Math.sin(baseAngle + Math.PI / 2) * (cornerLen * 0.6));
+          ctx.stroke();
+        }
+
+        // 中心十字准星
+        const crossSize = 30 + progress * 10;
+        const crossGap = 10;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.globalAlpha = alpha * 0.95;
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.moveTo(mx - crossSize, my);
+        ctx.lineTo(mx - crossGap, my);
+        ctx.moveTo(mx + crossGap, my);
+        ctx.lineTo(mx + crossSize, my);
+        ctx.moveTo(mx, my - crossSize);
+        ctx.lineTo(mx, my - crossGap);
+        ctx.moveTo(mx, my + crossGap);
+        ctx.lineTo(mx, my + crossSize);
+        ctx.stroke();
+
+        // 中心能量核心
+        const coreSize = 8 + progress * 12;
+        ctx.shadowColor = c.color || '#00d4ff';
+        ctx.shadowBlur = 30 + progress * 40;
+        ctx.fillStyle = progress > 0.6 ? '#ffffff' : c.color || '#00d4ff';
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(mx, my, coreSize, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+
+        // === 屏幕中央大号警告UI ===
+        ctx.save();
+        // 警告背景条
+        const barW = 400;
+        const barH = 70;
+        const barX = cx - barW / 2;
+        const barY = 100;
+        ctx.fillStyle = `rgba(0,20,40,0.8)`;
+        ctx.fillRect(barX, barY, barW, barH);
+        ctx.strokeStyle = c.color || '#00d4ff';
+        ctx.lineWidth = 3;
+        ctx.globalAlpha = 0.8 + pulse * 0.2;
+        ctx.strokeRect(barX, barY, barW, barH);
+
+        // 警告标题
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha = alpha;
+        ctx.fillText('⚠ 天基屠龙炮 轨道锁定 ⚠', cx, barY + 22);
+
+        // 倒计时数字
+        const remaining = Math.max(0, c.maxChargeTime - c.chargeTime);
+        ctx.font = 'bold 28px Arial';
+        ctx.fillStyle = progress > 0.8 ? '#ff4444' : (progress > 0.5 ? '#ffaa00' : c.color || '#00d4ff');
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 15;
+        ctx.fillText(remaining.toFixed(1) + 's', cx, barY + 52);
+
+        // 充能进度条
+        ctx.shadowBlur = 0;
+        const pgBarW = barW - 40;
+        const pgBarH = 8;
+        const pgBarX = barX + 20;
+        const pgBarY = barY + 62;
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillRect(pgBarX, pgBarY, pgBarW, pgBarH);
+        ctx.fillStyle = c.color || '#00d4ff';
+        ctx.fillRect(pgBarX, pgBarY, pgBarW * progress, pgBarH);
+
+        ctx.restore();
+
+        // 准星处的小提示
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.globalAlpha = alpha;
+        ctx.fillText('FIRE', mx, my - mainR - 10);
+
+        ctx.restore();
+      }
+    }
+
     // 敌人
     for (let e of enemies) {
       if (!e.alive) continue;

@@ -120,6 +120,17 @@ const SECONDARY_WEAPON_POOL = {
     color: '#2ecc71',
     type: 'heal',
   },
+  orbital_cannon: {
+    id: 'orbital_cannon',
+    name: '天基屠龙炮',
+    desc: '60秒冷却，每击杀敌人减少2秒CD。从轨道发射光束，对300px范围敌人造成攻击力×20的毁灭伤害',
+    cooldown: 60.0,
+    damageMult: 20.0,
+    aoeRadius: 300,
+    color: '#00d4ff',
+    type: 'orbital',
+    killReduceCd: 2.0,
+  },
 };
 
 // 副武器列表（用于弹出选项时迭代）
@@ -127,6 +138,7 @@ const SECONDARY_WEAPON_LIST = [
   SECONDARY_WEAPON_POOL.grenade_launcher,
   SECONDARY_WEAPON_POOL.grenade,
   SECONDARY_WEAPON_POOL.medkit,
+  SECONDARY_WEAPON_POOL.orbital_cannon,
 ];
 
 // ========== 主动技能系统 ==========
