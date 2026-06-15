@@ -90,6 +90,19 @@ function createDevPanel() {
   };
   panel.appendChild(xpMulBtn);
 
+  const spawnMulBtn = document.createElement('button');
+  const updateSpawnMulText = () => {
+    spawnMulBtn.textContent = '出怪 x' + (window._spawnRateMultiplier || 1) + '（切换）';
+  };
+  updateSpawnMulText();
+  spawnMulBtn.style.cssText = 'width:100%;margin-bottom:6px;padding:6px 10px;background:#c0392b;border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:11px;';
+  spawnMulBtn.onclick = () => {
+    const cur = window._spawnRateMultiplier || 1;
+    window._spawnRateMultiplier = cur === 1 ? 3 : cur === 3 ? 10 : 1;
+    updateSpawnMulText();
+  };
+  panel.appendChild(spawnMulBtn);
+
   const sep = document.createElement('hr');
   sep.style.cssText = 'width:100%;border:none;border-top:1px solid rgba(255,255,255,0.2);margin:8px 0;';
   panel.appendChild(sep);

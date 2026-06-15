@@ -20,6 +20,7 @@ let levelUpUi = null;
 let screenShake = { intensity: 0, duration: 0, elapsed: 0 };
 let cameraFlash = { intensity: 0, duration: 0, elapsed: 0 };
 let _activeSkillCharging = false;
+window._spawnRateMultiplier = 1;
 
 function init() {
   player = new Player();
@@ -150,11 +151,12 @@ function update(dt) {
 
   spawnTimer -= dt;
   if (spawnTimer <= 0) {
-    spawnEnemy();
+    const mult = window._spawnRateMultiplier || 1;
+    for (let i = 0; i < mult; i++) spawnEnemy();
     gameTime += spawnInterval;
     spawnInterval = Math.max(SPAWN_INTERVAL_MIN,
       SPAWN_INTERVAL_INIT - gameTime * SPAWN_INTERVAL_DECAY);
-    spawnTimer = spawnInterval;
+    spawnTimer = spawnInterval / mult;
   }
 }
 
