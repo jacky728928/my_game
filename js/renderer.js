@@ -805,7 +805,8 @@ class Renderer {
     if (savedScale) ctx.restore();
 
     // ====== 经验条（顶部居中） ======
-    const xpBarW = 180;
+    const isMobile = this.w < 600;
+    const xpBarW = isMobile ? 140 : 180;
     const xpBarH = 8;
     const xpBarX = this.w / 2 - xpBarW / 2;
     const xpBarY = 12;
@@ -819,7 +820,7 @@ class Renderer {
     ctx.fillStyle = XP_BAR_COLOR;
     ctx.fillRect(xpBarX, xpBarY, xpBarW * Math.min(1, xpPct), xpBarH);
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 10px Arial';
+    ctx.font = isMobile ? 'bold 9px Arial' : 'bold 10px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText('Lv' + player.level + '  XP ' + player.xp + '/' + player.xpToNext, this.w / 2, xpBarY + xpBarH + 4);
@@ -877,8 +878,18 @@ class Renderer {
       const slotSize = 62;
       const slotGap = 8;
       const totalW = MAX_SECONDARY_WEAPONS * slotSize + (MAX_SECONDARY_WEAPONS - 1) * slotGap;
-      let slotX = this.w - totalW - 12;
-      let slotY = 12;
+      const isMobile = this.w < 600;
+      // 移动端：放在小地图下方（左列）；桌面端：右上角
+      const minimapH = isMobile ? 100 : 120;
+      const minimapMargin = 12;
+      let slotX, slotY;
+      if (isMobile) {
+        slotX = 12;
+        slotY = minimapMargin + minimapH + 10;
+      } else {
+        slotX = this.w - totalW - 12;
+        slotY = 12;
+      }
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       for (let i = 0; i < MAX_SECONDARY_WEAPONS; i++) {

@@ -12,6 +12,7 @@ let targetMarkers = [];
 let spawnTimer = 0;
 let spawnInterval = SPAWN_INTERVAL_INIT;
 let gameTime = 0;
+let elapsedTime = 0;
 window._killCount = 0;
 let gameOver = false;
 let gamePaused = false;
@@ -34,11 +35,14 @@ function init() {
   spawnTimer = 0;
   spawnInterval = SPAWN_INTERVAL_INIT;
   gameTime = 0;
+  elapsedTime = 0;
   window._killCount = 0;
   gameOver = false;
   gamePaused = false;
   closeLevelUpUi();
+  closePauseMenu();
   ensureActiveSkillIcon();
+  ensurePauseBtn();
   openModeSelectUi();
 }
 
@@ -85,6 +89,7 @@ function update(dt) {
   if (!player.alive) return;
   if (gamePaused) return;
 
+  elapsedTime += dt;
   const [ix, iy] = input.getDirection();
   player.setVelocity(ix * player.speed, iy * player.speed);
   player.update(dt, bullets);
@@ -192,6 +197,12 @@ document.addEventListener('click', (e) => {
     const wheel = document.getElementById('wheel');
     if (wheel && wheel.contains(e.target)) return;
     restart();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.key === 'Esc') {
+    togglePauseMenu();
   }
 });
 

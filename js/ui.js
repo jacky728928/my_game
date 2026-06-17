@@ -376,3 +376,94 @@ function closeLevelUpUi() {
   levelUpUi = null;
   levelUpChoices = null;
 }
+
+// ========== 暂停菜单 ==========
+let _pauseMenu = null;
+let _pauseBtn = null;
+
+function ensurePauseBtn() {
+  if (_pauseBtn) return;
+  _pauseBtn = document.createElement('button');
+  _pauseBtn.id = 'pauseBtn';
+  _pauseBtn.textContent = 'II';
+  _pauseBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    togglePauseMenu();
+  });
+  document.body.appendChild(_pauseBtn);
+}
+
+function togglePauseMenu() {
+  if (_pauseMenu) {
+    closePauseMenu();
+  } else {
+    // 暂停时不能打开暂停（防止与升级界面重叠），已有升级界面则不响应
+    if (levelUpUi) return;
+    if (!player || !player.alive) return;
+    openPauseMenu();
+  }
+}
+
+function openPauseMenu() {
+  if (_pauseMenu) return;
+  gamePaused = true;
+  const container = document.createElement('div');
+  container.id = 'pauseMenu';
+
+  const title = document.createElement('div');
+  title.className = 'pm-title';
+  title.textContent = 'II 游戏暂停';
+
+  const sub = document.createElement('div');
+  sub.className = 'pm-sub';
+  sub.textContent = '按 ESC 或点击继续按钮恢复游戏';
+
+  const stats = document.createElement('div');
+  stats.className = 'pm-stats';
+  const sec = Math.floor(typeof elapsedTime !== 'undefined' ? elapsedTime : (gameTime || 0));
+  const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+  const ss = String(sec % 60).padStart(2, '0');
+  const secList = (player.secondaryWeapons || []).map(s => s.def.name).join('、') || '无';
+  const skillName = player.activeSkillId ? (ACTIVE_SKILL_POOL[player.activeSkillId]?.name || '-') : '无';
+  stats.innerHTML =
+    '<div><b>等级</b>' + (player.level || 1) + '</div>' +
+    '<div><b>HP</b>' + Math.round(player.hp || 0) + ' / ' + Math.round(player.maxHp || 0) + '</div>' +
+    '<div><b>攻击力</b>' + (Math.round(player.effectiveDamage * 10) / 10) + '</div>' +
+    '<div><b>生存时间</b>' + mm + ':' + ss + '</div>' +
+    '<div><b>击杀数</b>' + (window._killCount || 0) + '</div>' +
+    '<div><b>副武器</b>' + secList + '</div>' +
+    '<div><b>主动技能</b>' + skillName + '</div>';
+
+  const resumeBtn = document.createElement('div');
+  resumeBtn.className = 'pm-btn pm-resume';
+  resumeBtn.textContent = '▶ 继续游戏';
+  resumeBtn.addEventListener('click', () => closePauseMenu());
+
+  const restartBtn = document.createElement('div');
+  restartBtn.className = 'pm-btn pm-restart';
+  restartBtn.textContent = '⟳ 重新开始';
+  restartBtn.addEventListener('click', () => {
+    closePauseMenu();
+    if (typeof restart === 'function') restart();
+  });
+
+  const hint = document.createElement('div');
+  hint.className = 'pm-hint';
+  hint.textContent = '电脑：按 ESC 切换暂停 / 继续\n手机：点击右上角按钮切换暂停';
+
+  container.appendChild(title);
+  container.appendChild(sub);
+  container.appendChild(stats);
+  container.appendChild(resumeBtn);
+  container.appendChild(restartBtn);
+  container.appendChild(hint);
+  document.body.appendChild(container);
+  _pauseMenu = container;
+}
+
+function closePauseMenu() {
+  if (!_pauseMenu) return;
+  if (_pauseMenu.parentNode) _pauseMenu.parentNode.removeChild(_pauseMenu);
+  _pauseMenu = null;
+  gamePaused = false;
+}

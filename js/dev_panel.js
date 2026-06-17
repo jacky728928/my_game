@@ -6,7 +6,7 @@ function createDevPanel() {
   
   const panel = document.createElement('div');
   panel.id = 'devPanel';
-  panel.style.cssText = 'position:fixed;top:12px;right:12px;background:rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:12px;font-family:Arial,sans-serif;color:#fff;font-size:12px;z-index:400;user-select:none;min-width:140px;';
+  panel.style.cssText = 'position:fixed;top:12px;right:12px;background:rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:12px;font-family:Arial,sans-serif;color:#fff;font-size:12px;z-index:400;user-select:none;min-width:140px;' + (window.innerWidth < 600 ? 'top:64px!important;right:12px!important;' : '');
   
   const title = document.createElement('div');
   title.textContent = '🔧 开发者面板';

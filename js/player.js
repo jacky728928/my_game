@@ -152,13 +152,13 @@ class Player {
         this.damageBonus += 2;
         break;
       case 'view_range':
-        this.viewRangeBonus += 5;
+        this.viewRangeBonus += 25;
         break;
       case 'attack_range':
-        this.attackRangeBonus += 5;
+        this.attackRangeBonus += 25;
         break;
       case 'pickup_range':
-        this.pickupRangeBonus += 5;
+        this.pickupRangeBonus += 25;
         break;
       default:
         // 副武器专属技能：按完整 abilityId 累加等级（flat map，避免下划线拆分问题）

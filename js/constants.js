@@ -63,9 +63,9 @@ const ABILITY_POOL = [
   { id: 'attack_speed',  name: '急速射击', desc: '攻速 +20%（攻击间隔缩短）' },
   { id: 'crit_chance',  name: '致命一击', desc: '暴击概率 +10%（初始暴击倍率 150%）' },
   { id: 'damage',        name: '强化火力', desc: '基础攻击 +2 点伤害' },
-  { id: 'view_range',    name: '鹰眼视野', desc: '视野范围 +5%（显示更大区域）' },
-  { id: 'attack_range',  name: '超距感知', desc: '攻击范围 +5 px' },
-  { id: 'pickup_range',  name: '灵力汲取', desc: '经验吸取范围 +5 px' },
+  { id: 'view_range',    name: '鹰眼视野', desc: '视野范围 +25%（显示更大区域）' },
+  { id: 'attack_range',  name: '超距感知', desc: '攻击范围 +25 px' },
+  { id: 'pickup_range',  name: '灵力汲取', desc: '经验吸取范围 +25 px' },
 ];
 
 // 副武器专属技能池（需持有对应副武器才有概率抽到）
