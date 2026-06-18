@@ -1,9 +1,0 @@
----
-description: 
-alwaysApply: true
-enabled: true
-updatedAt: 2026-06-13T13:47:00.000Z
-provider: 
----
-
-每次对话先读 `.codebuddy/project.md` 了解项目。修改代码后同步更新 project.md 和 dev_log.md。

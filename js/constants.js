@@ -5,12 +5,12 @@ const WORLD_H = 2400;
 // 玩家
 const PLAYER_RADIUS = 18;
 const PLAYER_SPEED = 180;        // 像素/秒
-const PLAYER_MAX_HP = 100;
+const PLAYER_MAX_HP = 200;
 
 // 武器
 const PISTOL_RANGE = 250;        // 攻击范围半径
 const PISTOL_DAMAGE = 5;
-const PISTOL_INTERVAL = 1.0;    // 攻击间隔(秒)
+const PISTOL_INTERVAL = 0.8;    // 攻击间隔(秒)
 const BULLET_SPEED = 400;
 const BULLET_RADIUS = 4;
 
@@ -18,10 +18,10 @@ const BULLET_RADIUS = 4;
 const ENEMY_TIERS = [
   { level: 1, hp: 10,  size: 22, speedMin: 100, speedMax: 155, color: '#e74c3c', glow: '#f1948a' },
   { level: 2, hp: 20,  size: 26, speedMin:  90, speedMax: 145, color: '#e67e22', glow: '#f0b27a' },
-  { level: 3, hp: 30,  size: 30, speedMin:  80, speedMax: 135, color: '#f1c40f', glow: '#f9e054' },
-  { level: 4, hp: 40,  size: 34, speedMin:  70, speedMax: 125, color: '#2ecc71', glow: '#82e0aa' },
-  { level: 5, hp: 50,  size: 38, speedMin:  60, speedMax: 115, color: '#3498db', glow: '#85c1e9' },
-  { level: 6, hp: 60,  size: 42, speedMin:  50, speedMax: 105, color: '#9b59b6', glow: '#c39bd3' },
+  { level: 3, hp: 40,  size: 30, speedMin:  80, speedMax: 135, color: '#f1c40f', glow: '#f9e054' },
+  { level: 4, hp: 60,  size: 34, speedMin:  70, speedMax: 125, color: '#2ecc71', glow: '#82e0aa' },
+  { level: 5, hp: 80,  size: 38, speedMin:  60, speedMax: 115, color: '#3498db', glow: '#85c1e9' },
+  { level: 6, hp: 100,  size: 42, speedMin:  50, speedMax: 105, color: '#9b59b6', glow: '#c39bd3' },
 ];
 const SPAWN_INTERVAL_INIT = 2.5;
 const SPAWN_INTERVAL_MIN = 0.6;
