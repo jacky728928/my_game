@@ -31,15 +31,18 @@ class Renderer {
     const cx = this.w / 2;
     const cy = this.h / 2;
 
-    // 视野缩放（视野+5%时，canvas放大5%，中央区域不变）
+    // 视野缩放：以屏幕中心为基准缩放世界内容
+    //   viewRangeBonus +25% → vrMult = 0.8 → 世界缩小，屏幕显示更多内容
+    //   调整后：实际可见的世界范围 = vw × vh = (w/vrMult) × (h/vrMult)
     const vrMult = player.viewRangeMultiplier || 1;
     const savedScale = vrMult !== 1;
+    const vw = this.w / vrMult;   // 调整后的世界可见宽度
+    const vh = this.h / vrMult;   // 调整后的世界可见高度
 
     // 背景
     ctx.fillStyle = COLOR_BG;
     ctx.fillRect(0, 0, this.w, this.h);
 
-    // 视野缩放：以屏幕中心为基准缩放世界内容
     if (savedScale) {
       ctx.save();
       ctx.translate(cx, cy);
@@ -49,18 +52,18 @@ class Renderer {
 
     // 网格
     const gridSize = 80;
-    const startCol = Math.floor((camX - this.w / 2) / gridSize) * gridSize;
-    const startRow = Math.floor((camY - this.h / 2) / gridSize) * gridSize;
+    const startCol = Math.floor((camX - vw / 2) / gridSize) * gridSize;
+    const startRow = Math.floor((camY - vh / 2) / gridSize) * gridSize;
     ctx.strokeStyle = COLOR_GRID;
     ctx.lineWidth = 1;
-    for (let x = startCol; x <= camX + this.w / 2 + gridSize; x += gridSize) {
+    for (let x = startCol; x <= camX + vw / 2 + gridSize; x += gridSize) {
       const sx = x - camX + cx;
       ctx.beginPath();
       ctx.moveTo(sx, 0);
       ctx.lineTo(sx, this.h);
       ctx.stroke();
     }
-    for (let y = startRow; y <= camY + this.h / 2 + gridSize; y += gridSize) {
+    for (let y = startRow; y <= camY + vh / 2 + gridSize; y += gridSize) {
       const sy = y - camY + cy;
       ctx.beginPath();
       ctx.moveTo(0, sy);
@@ -77,8 +80,8 @@ class Renderer {
     for (let w of walls) {
       const wx = w.x - camX + cx;
       const wy = w.y - camY + cy;
-      // 简单裁剪：完全在屏幕外的不画
-      if (wx + w.w < 0 || wx > this.w || wy + w.h < 0 || wy > this.h) continue;
+      // 简单裁剪：完全在可见世界范围外的不画
+      if (wx + w.w < 0 || wx > vw || wy + w.h < 0 || wy > vh) continue;
       const wallColor = WALL_COLORS[w.type] || '#7a7a7a';
       ctx.fillStyle = wallColor;
       ctx.fillRect(wx, wy, w.w, w.h);
@@ -120,7 +123,7 @@ class Renderer {
       if (!b.alive) continue;
       const bx = b.x - camX + cx;
       const by = b.y - camY + cy;
-      if (bx < -20 || bx > this.w + 20 || by < -20 || by > this.h + 20) continue;
+      if (bx < -20 || bx > vw + 20 || by < -20 || by > vh + 20) continue;
       ctx.fillStyle = COLOR_BULLET;
       ctx.shadowColor = COLOR_BULLET;
       ctx.shadowBlur = 6;
@@ -136,7 +139,7 @@ class Renderer {
       if (!orb.alive) continue;
       const ox = orb.x - camX + cx;
       const oy = orb.y - camY + cy + Math.sin(now * 3 + orb.bobPhase) * 3;
-      if (ox < -20 || ox > this.w + 20 || oy < -20 || oy > this.h + 20) continue;
+      if (ox < -20 || ox > vw + 20 || oy < -20 || oy > vh + 20) continue;
       // 光晕
       ctx.fillStyle = orb.color + '66';
       ctx.beginPath();
@@ -157,7 +160,7 @@ class Renderer {
       for (let g of grenades) {
         const gx = g.x - camX + cx;
         const gy = g.y - camY + cy;
-        if (gx < -100 || gx > this.w + 100 || gy < -100 || gy > this.h + 100) continue;
+        if (gx < -100 || gx > vw + 100 || gy < -100 || gy > vh + 100) continue;
 
         if (!g.landed) {
           // 飞行中的手雷：椭圆旋转体 + 外发光 + 烟雾尾迹 + 高光
@@ -296,7 +299,7 @@ class Renderer {
       for (let s of shells) {
         const sx = s.x - camX + cx;
         const sy = s.y - camY + cy;
-        if (sx < -100 || sx > this.w + 100 || sy < -100 || sy > this.h + 100) continue;
+        if (sx < -100 || sx > vw + 100 || sy < -100 || sy > vh + 100) continue;
 
         ctx.save();
         // 外层光晕（大）
@@ -509,10 +512,10 @@ class Renderer {
 
         ctx.save();
 
-        // 屏幕边缘红色警告闪烁
+        // 屏幕边缘红色警告闪烁（需匹配视野调整后的可见范围）
         const warnAlpha = (0.15 + progress * 0.15) * (0.5 + 0.5 * Math.sin(now3 * 8));
         ctx.fillStyle = `rgba(0,100,200,${warnAlpha})`;
-        ctx.fillRect(0, 0, this.w, this.h);
+        ctx.fillRect(0, 0, vw, vh);
 
         // 第1层：外圈大虚线圆（缓慢收缩）
         const outerR = c.aoeRadius * (1.6 - progress * 0.6);
@@ -675,7 +678,7 @@ class Renderer {
       if (!e.alive) continue;
       const ex = e.x - camX + cx;
       const ey = e.y - camY + cy;
-      if (ex < -50 || ex > this.w + 50 || ey < -50 || ey > this.h + 50) continue;
+      if (ex < -50 || ex > vw + 50 || ey < -50 || ey > vh + 50) continue;
       const half = e.half;
       // 方块本体
       ctx.fillStyle = e.color;
@@ -739,7 +742,7 @@ class Renderer {
     // 玩家
     if (player.damageFlash > 0) {
       ctx.fillStyle = COLOR_DAMAGE_FLASH;
-      ctx.fillRect(0, 0, this.w, this.h);
+      ctx.fillRect(0, 0, vw, vh);
     }
     // 外圈
     ctx.fillStyle = 'rgba(52,152,219,0.2)';

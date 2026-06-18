@@ -6,6 +6,35 @@ let walls = [];
 function generateWalls() {
   walls = [];
 
+  // 检查是否有待加载的地图数据
+  if (window._pendingMapData) {
+    const mapData = window._pendingMapData;
+    // 应用世界尺寸
+    if (mapData.world) {
+      window.WORLD_W = mapData.world.width;
+      window.WORLD_H = mapData.world.height;
+    }
+    // 加载墙体
+    if (mapData.walls) {
+      mapData.walls.forEach(w => {
+        walls.push({
+          x: w.x,
+          y: w.y,
+          w: w.w,
+          h: w.h,
+          type: w.type || WALL_TYPE.MID
+        });
+      });
+    }
+    // 保存玩家出生点
+    if (mapData.playerSpawn) {
+      window._pendingPlayerSpawn = { x: mapData.playerSpawn.x, y: mapData.playerSpawn.y };
+    }
+    // 清除待加载数据
+    window._pendingMapData = null;
+    return;
+  }
+
   const cx = WORLD_W / 2;
   const cy = WORLD_H / 2;
 

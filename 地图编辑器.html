@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>地图编辑器 - 墙体设计工具</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #21262d;
+      --border: #30363d;
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --accent-cyan: #58a6ff;
+      --accent-green: #3fb950;
+      --accent-orange: #d29922;
+      --accent-red: #f85149;
+      --accent-purple: #a371f7;
+      --wall-low: #6b8e4e;
+      --wall-mid: #9a9a9a;
+      --wall-high: #5a5a8e;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      background-image: 
+        radial-gradient(circle at 20% 50%, rgba(88, 166, 255, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 80% 50%, rgba(163, 113, 247, 0.03) 0%, transparent 50%);
+    }
+
+    .app-container {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* 左侧工具栏 */
+    .toolbar {
+      width: 280px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 20px;
+      overflow-y: auto;
+    }
+
+    .toolbar-section {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .toolbar-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-title::before {
+      content: '';
+      width: 3px;
+      height: 12px;
+      background: var(--accent-cyan);
+      border-radius: 2px;
+    }
+
+    /* 墙体类型选择 */
+    .wall-types {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .wall-type-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 13px;
+    }
+
+    .wall-type-btn:hover {
+      border-color: var(--text-secondary);
+      transform: translateX(4px);
+    }
+
+    .wall-type-btn.active {
+      border-color: var(--accent-cyan);
+      background: rgba(88, 166, 255, 0.1);
+    }
+
+    .wall-type-btn[data-type="low"].active {
+      border-color: var(--wall-low);
+      background: rgba(107, 142, 78, 0.15);
+    }
+
+    .wall-type-btn[data-type="mid"].active {
+      border-color: var(--wall-mid);
+      background: rgba(154, 154, 154, 0.15);
+    }
+
+    .wall-type-btn[data-type="high"].active {
+      border-color: var(--wall-high);
+      background: rgba(90, 90, 142, 0.15);
+    }
+
+    .wall-preview {
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .wall-preview.low { background: var(--wall-low); }
+    .wall-preview.mid { background: var(--wall-mid); }
+    .wall-preview.high { background: var(--wall-high); }
+
+    .wall-info {
+      flex: 1;
+      text-align: left;
+    }
+
+    .wall-name {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .wall-desc {
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    /* 工具选择 */
+    .tools {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tool-btn {
+      flex: 1;
+      padding: 12px 8px;
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tool-btn:hover {
+      border-color: var(--text-secondary);
+    }
+
+    .tool-btn.active {
+      border-color: var(--accent-cyan);
+      background: rgba(88, 166, 255, 0.1);
+    }
+
+    .tool-icon {
+      font-size: 20px;
+    }
+
+    /* 世界设置 */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .setting-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .setting-label {
+      font-size: 10px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .setting-input {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 10px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 13px;
+      width: 100%;
+    }
+
+    .setting-input:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+    }
+
+    /* 操作按钮 */
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .action-btn {
+      padding: 12px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .action-btn.primary {
+      background: linear-gradient(135deg, var(--accent-cyan), #1f6feb);
+      color: white;
+    }
+
+    .action-btn.primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
+    }
+
+    .action-btn.secondary {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .action-btn.secondary:hover {
+      border-color: var(--text-secondary);
+    }
+
+    .action-btn.danger {
+      background: rgba(248, 81, 73, 0.15);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+    }
+
+    .action-btn.danger:hover {
+      background: rgba(248, 81, 73, 0.25);
+    }
+
+    /* 墙体列表 */
+    .walls-list {
+      flex: 1;
+      overflow-y: auto;
+      max-height: 200px;
+    }
+
+    .wall-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      margin-bottom: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .wall-item:hover {
+      border-color: var(--text-secondary);
+    }
+
+    .wall-item.selected {
+      border-color: var(--accent-cyan);
+    }
+
+    .wall-item-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+    }
+
+    .wall-item-info {
+      flex: 1;
+    }
+
+    .wall-item-delete {
+      width: 20px;
+      height: 20px;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .wall-item:hover .wall-item-delete {
+      opacity: 1;
+    }
+
+    .wall-item-delete:hover {
+      color: var(--accent-red);
+    }
+
+    /* 主画布区域 */
+    .canvas-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .canvas-header {
+      padding: 12px 20px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .canvas-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .canvas-stats {
+      display: flex;
+      gap: 20px;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-value {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: var(--bg-primary);
+    }
+
+    #mapCanvas {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #0a0c10;
+      border: 2px solid var(--border);
+      box-shadow: 0 0 60px rgba(88, 166, 255, 0.1);
+    }
+
+    /* 网格背景 */
+    .grid-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 0.3;
+    }
+
+    /* 预览信息 */
+    .preview-info {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-size: 11px;
+      display: flex;
+      gap: 20px;
+    }
+
+    .preview-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .preview-label {
+      color: var(--text-secondary);
+    }
+
+    .preview-value {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    /* 导出弹窗 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 700px;
+      max-height: 80vh;
+      overflow: hidden;
+      transform: scale(0.9);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-overlay.active .modal {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.15s;
+    }
+
+    .modal-close:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .modal-body {
+      padding: 20px;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+
+    .export-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .export-tab {
+      padding: 8px 16px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      transition: all 0.15s;
+    }
+
+    .export-tab.active {
+      background: var(--accent-cyan);
+      border-color: var(--accent-cyan);
+      color: white;
+    }
+
+    .export-code {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 300px;
+      overflow-y: auto;
+      color: var(--accent-green);
+    }
+
+    .modal-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* 键盘提示 */
+    .shortcuts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .shortcut {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    .key {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 2px 6px;
+      font-size: 9px;
+    }
+
+    /* 玩家出生点 */
+    .spawn-point {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      transform: translate(-50%, -50%);
+      cursor: move;
+      z-index: 10;
+    }
+
+    .spawn-point::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 12px;
+      height: 12px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 0 10px var(--accent-green);
+    }
+
+    .spawn-point::after {
+      content: 'P';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 8px;
+      font-weight: bold;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- 左侧工具栏 -->
+    <div class="toolbar">
+      <!-- 世界设置 -->
+      <div class="toolbar-section">
+        <div class="toolbar-title">世界设置</div>
+        <div class="settings-grid">
+          <div class="setting-item">
+            <label class="setting-label">宽度</label>
+            <input type="number" class="setting-input" id="worldWidth" value="1600">
+          </div>
+          <div class="setting-item">
+            <label class="setting-label">高度</label>
+            <input type="number" class="setting-input" id="worldHeight" value="900">
+          </div>
+        </div>
+      </div>
+
+      <!-- 墙体类型 -->
+      <div class="toolbar-section">
+        <div class="toolbar-title">墙体类型</div>
+        <div class="wall-types">
+          <button class="wall-type-btn active" data-type="low">
+            <div class="wall-preview low"></div>
+            <div class="wall-info">
+              <div class="wall-name">矮墙</div>
+              <div class="wall-desc">子弹可穿透 / 阻挡移动</div>
+            </div>
+          </button>
+          <button class="wall-type-btn" data-type="mid">
+            <div class="wall-preview mid"></div>
+            <div class="wall-info">
+              <div class="wall-name">中墙</div>
+              <div class="wall-desc">子弹减速 / 阻挡移动</div>
+            </div>
+          </button>
+          <button class="wall-type-btn" data-type="high">
+            <div class="wall-preview high"></div>
+            <div class="wall-info">
+              <div class="wall-name">高墙</div>
+              <div class="wall-desc">完全阻挡 / 最高高度</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- 绘制工具 -->
+      <div class="toolbar-section">
+        <div class="toolbar-title">绘制工具</div>
+        <div class="tools">
+          <button class="tool-btn active" data-tool="rect" title="矩形绘制 (R)">
+            <span class="tool-icon">▢</span>
+            矩形
+          </button>
+          <button class="tool-btn" data-tool="line" title="线性绘制 (L)">
+            <span class="tool-icon">╱</span>
+            线性
+          </button>
+          <button class="tool-btn" data-tool="erase" title="删除模式 (E)">
+            <span class="tool-icon">✕</span>
+            删除
+          </button>
+        </div>
+      </div>
+
+      <!-- 操作 -->
+      <div class="toolbar-section">
+        <div class="toolbar-title">操作</div>
+        <div class="actions">
+          <button class="action-btn secondary" id="btnClear">
+            <span>🗑</span> 清空所有
+          </button>
+          <button class="action-btn primary" id="btnExport">
+            <span>📤</span> 导出地图
+          </button>
+        </div>
+      </div>
+
+      <!-- 墙体列表 -->
+      <div class="toolbar-section" style="flex: 1; display: flex; flex-direction: column;">
+        <div class="toolbar-title">墙体列表 (<span id="wallCount">0</span>)</div>
+        <div class="walls-list" id="wallsList"></div>
+      </div>
+
+      <!-- 快捷键 -->
+      <div class="toolbar-section">
+        <div class="toolbar-title">快捷键</div>
+        <div class="shortcuts">
+          <div class="shortcut"><span class="key">1</span>矮墙</div>
+          <div class="shortcut"><span class="key">2</span>中墙</div>
+          <div class="shortcut"><span class="key">3</span>高墙</div>
+          <div class="shortcut"><span class="key">R</span>矩形</div>
+          <div class="shortcut"><span class="key">L</span>线性</div>
+          <div class="shortcut"><span class="key">Del</span>删除</div>
+          <div class="shortcut"><span class="key">P</span>玩家位置</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主画布区域 -->
+    <div class="canvas-area">
+      <div class="canvas-header">
+        <div class="canvas-title">地图画布</div>
+        <div class="canvas-stats">
+          <div class="stat-item">
+            <span>网格:</span>
+            <span class="stat-value" id="gridSize">20px</span>
+          </div>
+          <div class="stat-item">
+            <span>墙体:</span>
+            <span class="stat-value" id="totalWalls">0</span>
+          </div>
+          <div class="stat-item">
+            <span>坐标:</span>
+            <span class="stat-value" id="mousePos">0, 0</span>
+          </div>
+        </div>
+      </div>
+      <div class="canvas-container" id="canvasContainer">
+        <canvas id="mapCanvas"></canvas>
+      </div>
+      <div class="preview-info">
+        <div class="preview-item">
+          <span class="preview-label">当前类型:</span>
+          <span class="preview-value" id="currentType">矮墙</span>
+        </div>
+        <div class="preview-item">
+          <span class="preview-label">当前工具:</span>
+          <span class="preview-value" id="currentTool">矩形绘制</span>
+        </div>
+        <div class="preview-item">
+          <span class="preview-label">提示:</span>
+          <span class="preview-value" id="hint">按住拖拽绘制墙体</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 导出弹窗 -->
+  <div class="modal-overlay" id="exportModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">导出地图数据</div>
+        <button class="modal-close" id="modalClose">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="export-tabs">
+          <button class="export-tab active" data-format="json">JSON</button>
+          <button class="export-tab" data-format="js">JavaScript</button>
+          <button class="export-tab" data-format="lua">Lua</button>
+        </div>
+        <pre class="export-code" id="exportCode"></pre>
+      </div>
+      <div class="modal-footer">
+        <button class="action-btn secondary" id="btnCopy">
+          <span>📋</span> 复制代码
+        </button>
+        <button class="action-btn primary" id="btnDownload">
+          <span>💾</span> 下载文件
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==================== 地图编辑器核心逻辑 ====================
+    
+    const WALL_COLORS = {
+      low: { fill: '#6b8e4e', stroke: '#8ab066', text: 'LOW' },
+      mid: { fill: '#9a9a9a', stroke: '#b8b8b8', text: 'MID' },
+      high: { fill: '#5a5a8e', stroke: '#7878b8', text: 'HIGH' }
+    };
+
+    const WALL_TYPES = {
+      low: { name: '矮墙', blocksDirect: false, blocksArcing: false },
+      mid: { name: '中墙', blocksDirect: true, blocksArcing: false },
+      high: { name: '高墙', blocksDirect: true, blocksArcing: true }
+    };
+
+    // 状态
+    let walls = [];
+    let selectedWallType = 'low';
+    let currentTool = 'rect';
+    let selectedWallIndex = -1;
+    let playerSpawn = { x: 800, y: 450 };
+    
+    // 绘制状态
+    let isDrawing = false;
+    let drawStart = { x: 0, y: 0 };
+    let currentMouse = { x: 0, y: 0 };
+    let isDraggingSpawn = false;
+
+    // Canvas
+    const canvas = document.getElementById('mapCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvasContainer');
+
+    // 世界尺寸
+    let worldWidth = 1600;
+    let worldHeight = 900;
+
+    // 缩放和偏移
+    let scale = 1;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    // ==================== 初始化 ====================
+    
+    function init() {
+      resizeCanvas();
+      setupEventListeners();
+      render();
+    }
+
+    function resizeCanvas() {
+      worldWidth = parseInt(document.getElementById('worldWidth').value) || 1600;
+      worldHeight = parseInt(document.getElementById('worldHeight').value) || 900;
+      
+      canvas.width = worldWidth;
+      canvas.height = worldHeight;
+      
+      // 适应容器
+      const containerRect = container.getBoundingClientRect();
+      const scaleX = (containerRect.width - 40) / worldWidth;
+      const scaleY = (containerRect.height - 40) / worldHeight;
+      scale = Math.min(scaleX, scaleY, 1);
+      
+      canvas.style.width = (worldWidth * scale) + 'px';
+      canvas.style.height = (worldHeight * scale) + 'px';
+    }
+
+    // ==================== 事件监听 ====================
+    
+    function setupEventListeners() {
+      // 窗口调整
+      window.addEventListener('resize', () => {
+        resizeCanvas();
+        render();
+      });
+
+      // 世界尺寸变化
+      document.getElementById('worldWidth').addEventListener('change', () => {
+        resizeCanvas();
+        render();
+      });
+      document.getElementById('worldHeight').addEventListener('change', () => {
+        resizeCanvas();
+        render();
+      });
+
+      // 墙体类型选择
+      document.querySelectorAll('.wall-type-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.wall-type-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          selectedWallType = btn.dataset.type;
+          updatePreviewInfo();
+        });
+      });
+
+      // 工具选择
+      document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentTool = btn.dataset.tool;
+          canvas.style.cursor = currentTool === 'erase' ? 'crosshair' : 'crosshair';
+          updatePreviewInfo();
+        });
+      });
+
+      // Canvas鼠标事件
+      canvas.addEventListener('mousedown', handleMouseDown);
+      canvas.addEventListener('mousemove', handleMouseMove);
+      canvas.addEventListener('mouseup', handleMouseUp);
+      canvas.addEventListener('mouseleave', handleMouseUp);
+      
+      // 触摸事件
+      canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+      canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+      canvas.addEventListener('touchend', handleTouchEnd);
+      canvas.addEventListener('touchcancel', handleTouchEnd);
+
+      // 键盘快捷键
+      document.addEventListener('keydown', handleKeyDown);
+
+      // 按钮事件
+      document.getElementById('btnClear').addEventListener('click', clearAll);
+      document.getElementById('btnExport').addEventListener('click', showExportModal);
+      document.getElementById('modalClose').addEventListener('click', hideExportModal);
+      document.getElementById('btnCopy').addEventListener('click', copyToClipboard);
+      document.getElementById('btnDownload').addEventListener('click', downloadFile);
+      
+      // 导出格式切换
+      document.querySelectorAll('.export-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.export-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          updateExportCode(tab.dataset.format);
+        });
+      });
+
+      // 点击模态框外部关闭
+      document.getElementById('exportModal').addEventListener('click', (e) => {
+        if (e.target.id === 'exportModal') hideExportModal();
+      });
+    }
+
+    // ==================== 鼠标/触摸处理 ====================
+    
+    function getCanvasPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left) / scale,
+        y: (e.clientY - rect.top) / scale
+      };
+    }
+
+    function handleMouseDown(e) {
+      const pos = getCanvasPos(e);
+      currentMouse = pos;
+      
+      // 检查是否点击玩家出生点
+      const spawnDist = Math.hypot(pos.x - playerSpawn.x, pos.y - playerSpawn.y);
+      if (spawnDist < 20) {
+        isDraggingSpawn = true;
+        return;
+      }
+      
+      // 检查是否点击删除墙体
+      if (currentTool === 'erase') {
+        const idx = getWallAtPos(pos.x, pos.y);
+        if (idx !== -1) {
+          walls.splice(idx, 1);
+          updateWallsList();
+          render();
+        }
+        return;
+      }
+      
+      // 检查是否选中墙体
+      const idx = getWallAtPos(pos.x, pos.y);
+      if (idx !== -1 && currentTool !== 'erase') {
+        selectedWallIndex = idx;
+        // 显示选中状态
+        document.querySelectorAll('.wall-item').forEach((item, i) => {
+          item.classList.toggle('selected', i === idx);
+        });
+        render();
+        return;
+      }
+      
+      // 开始绘制
+      isDrawing = true;
+      drawStart = { ...pos };
+      selectedWallIndex = -1;
+    }
+
+    function handleMouseMove(e) {
+      const pos = getCanvasPos(e);
+      currentMouse = pos;
+      
+      // 更新坐标显示
+      document.getElementById('mousePos').textContent = `${Math.round(pos.x)}, ${Math.round(pos.y)}`;
+      
+      if (isDraggingSpawn) {
+        playerSpawn = { x: Math.max(20, Math.min(worldWidth - 20, pos.x)), y: Math.max(20, Math.min(worldHeight - 20, pos.y)) };
+        render();
+        return;
+      }
+      
+      if (isDrawing) {
+        render();
+        drawPreview();
+      }
+    }
+
+    function handleMouseUp(e) {
+      if (isDraggingSpawn) {
+        isDraggingSpawn = false;
+        return;
+      }
+      
+      if (isDrawing) {
+        const pos = getCanvasPos(e);
+        finishDrawing(pos);
+      }
+      isDrawing = false;
+    }
+
+    function handleTouchStart(e) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      handleMouseDown({ clientX: touch.clientX, clientY: touch.clientY });
+    }
+
+    function handleTouchMove(e) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
+    }
+
+    function handleTouchEnd(e) {
+      if (e.changedTouches.length > 0) {
+        const touch = e.changedTouches[0];
+        handleMouseUp({ clientX: touch.clientX, clientY: touch.clientY });
+      }
+    }
+
+    // ==================== 绘制逻辑 ====================
+    
+    function finishDrawing(endPos) {
+      const x1 = Math.min(drawStart.x, endPos.x);
+      const y1 = Math.min(drawStart.y, endPos.y);
+      const x2 = Math.max(drawStart.x, endPos.x);
+      const y2 = Math.max(drawStart.y, endPos.y);
+      
+      const width = x2 - x1;
+      const height = y2 - y1;
+      
+      // 忽略太小的绘制
+      if (width < 10 && height < 10) {
+        render();
+        return;
+      }
+      
+      // 根据工具类型创建墙体
+      if (currentTool === 'rect') {
+        walls.push({
+          x: x1,
+          y: y1,
+          w: width,
+          h: height,
+          type: selectedWallType
+        });
+      } else if (currentTool === 'line') {
+        // 线性墙体转换为细长矩形
+        const thickness = 30;
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const length = Math.hypot(dx, dy);
+        
+        if (length > 10) {
+          const angle = Math.atan2(dy, dx);
+          const perpAngle = angle + Math.PI / 2;
+          
+          // 计算线段矩形边界
+          const perpX = (Math.cos(perpAngle) * thickness) / 2;
+          const perpY = (Math.sin(perpAngle) * thickness) / 2;
+          
+          walls.push({
+            x: x1 - perpX,
+            y: y1 - perpY,
+            w: dx + perpX * 2,
+            h: dy + perpY * 2,
+            type: selectedWallType,
+            isLine: true,
+            x1: x1, y1: y1, x2: x2, y2: y2,
+            thickness: thickness
+          });
+        }
+      }
+      
+      updateWallsList();
+      render();
+    }
+
+    function drawPreview() {
+      ctx.save();
+      
+      const x1 = Math.min(drawStart.x, currentMouse.x);
+      const y1 = Math.min(drawStart.y, currentMouse.y);
+      const x2 = Math.max(drawStart.x, currentMouse.x);
+      const y2 = Math.max(drawStart.y, currentMouse.y);
+      
+      const colors = WALL_COLORS[selectedWallType];
+      
+      ctx.fillStyle = colors.fill + '80';
+      ctx.strokeStyle = colors.stroke;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      
+      if (currentTool === 'line') {
+        // 绘制线性预览
+        ctx.beginPath();
+        ctx.moveTo(drawStart.x, drawStart.y);
+        ctx.lineTo(currentMouse.x, currentMouse.y);
+        ctx.lineWidth = 30;
+        ctx.strokeStyle = colors.fill + '60';
+        ctx.stroke();
+        
+        // 端点标记
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(drawStart.x, drawStart.y, 8, 0, Math.PI * 2);
+        ctx.arc(currentMouse.x, currentMouse.y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = colors.fill;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else {
+        ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      }
+      
+      // 显示尺寸
+      ctx.setLineDash([]);
+      ctx.font = '12px JetBrains Mono';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`${Math.round(x2 - x1)} × ${Math.round(y2 - y1)}`, x2 + 10, y1 + 12);
+      
+      ctx.restore();
+    }
+
+    // ==================== 渲染 ====================
+    
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // 背景
+      ctx.fillStyle = '#0a0c10';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // 网格
+      drawGrid();
+      
+      // 墙体
+      walls.forEach((wall, index) => {
+        drawWall(wall, index === selectedWallIndex);
+      });
+      
+      // 玩家出生点
+      drawSpawnPoint();
+      
+      // 边界
+      ctx.strokeStyle = '#30363d';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(0, 0, worldWidth, worldHeight);
+    }
+
+    function drawGrid() {
+      const gridSize = 40;
+      ctx.strokeStyle = '#1a1f26';
+      ctx.lineWidth = 1;
+      
+      // 垂直线
+      for (let x = 0; x <= worldWidth; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, worldHeight);
+        ctx.stroke();
+      }
+      
+      // 水平线
+      for (let y = 0; y <= worldHeight; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(worldWidth, y);
+        ctx.stroke();
+      }
+    }
+
+    function drawWall(wall, selected) {
+      const colors = WALL_COLORS[wall.type];
+      
+      ctx.save();
+      
+      // 填充
+      ctx.fillStyle = colors.fill;
+      ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+      
+      // 边框
+      ctx.strokeStyle = selected ? '#fff' : colors.stroke;
+      ctx.lineWidth = selected ? 3 : 2;
+      ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
+      
+      // 选中高亮
+      if (selected) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+      }
+      
+      // 类型标签
+      ctx.font = 'bold 10px JetBrains Mono';
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      // 计算中心点
+      const centerX = wall.x + wall.w / 2;
+      const centerY = wall.y + wall.h / 2;
+      
+      // 标签背景
+      const labelWidth = 36;
+      const labelHeight = 14;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(centerX - labelWidth/2, centerY - labelHeight/2, labelWidth, labelHeight);
+      
+      // 标签文字
+      ctx.fillStyle = colors.fill;
+      ctx.fillText(colors.text, centerX, centerY);
+      
+      ctx.restore();
+    }
+
+    function drawSpawnPoint() {
+      ctx.save();
+      
+      // 外圈
+      ctx.beginPath();
+      ctx.arc(playerSpawn.x, playerSpawn.y, 18, 0, Math.PI * 2);
+      ctx.strokeStyle = '#3fb950';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      
+      // 内圈
+      ctx.beginPath();
+      ctx.arc(playerSpawn.x, playerSpawn.y, 12, 0, Math.PI * 2);
+      ctx.fillStyle = '#3fb950';
+      ctx.fill();
+      
+      // 玩家图标
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 10px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('P', playerSpawn.x, playerSpawn.y);
+      
+      // 标签
+      ctx.font = '10px JetBrains Mono';
+      ctx.fillStyle = '#3fb950';
+      ctx.textAlign = 'left';
+      ctx.fillText('出生点', playerSpawn.x + 25, playerSpawn.y);
+      
+      ctx.restore();
+    }
+
+    // ==================== 辅助函数 ====================
+    
+    function getWallAtPos(x, y) {
+      for (let i = walls.length - 1; i >= 0; i--) {
+        const w = walls[i];
+        if (x >= w.x && x <= w.x + w.w && y >= w.y && y <= w.y + w.h) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    function updateWallsList() {
+      const list = document.getElementById('wallsList');
+      list.innerHTML = '';
+      
+      walls.forEach((wall, index) => {
+        const item = document.createElement('div');
+        item.className = 'wall-item' + (index === selectedWallIndex ? ' selected' : '');
+        item.innerHTML = `
+          <div class="wall-item-color" style="background: ${WALL_COLORS[wall.type].fill}"></div>
+          <div class="wall-item-info">
+            ${WALL_TYPES[wall.type].name} #${index + 1}<br>
+            <small style="color: var(--text-secondary)">${Math.round(wall.w)} × ${Math.round(wall.h)}</small>
+          </div>
+          <button class="wall-item-delete" data-index="${index}">×</button>
+        `;
+        
+        item.addEventListener('click', (e) => {
+          if (!e.target.classList.contains('wall-item-delete')) {
+            selectedWallIndex = index;
+            document.querySelectorAll('.wall-item').forEach((item, i) => {
+              item.classList.toggle('selected', i === index);
+            });
+            render();
+          }
+        });
+        
+        item.querySelector('.wall-item-delete').addEventListener('click', () => {
+          walls.splice(index, 1);
+          if (selectedWallIndex === index) selectedWallIndex = -1;
+          else if (selectedWallIndex > index) selectedWallIndex--;
+          updateWallsList();
+          render();
+        });
+        
+        list.appendChild(item);
+      });
+      
+      document.getElementById('wallCount').textContent = walls.length;
+      document.getElementById('totalWalls').textContent = walls.length;
+    }
+
+    function updatePreviewInfo() {
+      document.getElementById('currentType').textContent = WALL_TYPES[selectedWallType].name;
+      document.getElementById('currentTool').textContent = {
+        rect: '矩形绘制',
+        line: '线性绘制',
+        erase: '删除模式'
+      }[currentTool];
+      document.getElementById('hint').textContent = {
+        rect: '按住拖拽绘制矩形墙体',
+        line: '按住拖拽绘制线形墙体',
+        erase: '点击墙体即可删除'
+      }[currentTool];
+    }
+
+    function clearAll() {
+      if (confirm('确定要清空所有墙体吗？')) {
+        walls = [];
+        selectedWallIndex = -1;
+        updateWallsList();
+        render();
+      }
+    }
+
+    // ==================== 导出功能 ====================
+    
+    function showExportModal() {
+      document.getElementById('exportModal').classList.add('active');
+      updateExportCode('json');
+    }
+
+    function hideExportModal() {
+      document.getElementById('exportModal').classList.remove('active');
+    }
+
+    function updateExportCode(format) {
+      const codeEl = document.getElementById('exportCode');
+      const data = generateMapData();
+      
+      switch (format) {
+        case 'json':
+          codeEl.textContent = JSON.stringify(data, null, 2);
+          break;
+        case 'js':
+          codeEl.textContent = `// 地图数据 - ${new Date().toLocaleDateString()}\nconst MAP_DATA = ${JSON.stringify(data, null, 2)};\n\nexport default MAP_DATA;`;
+          break;
+        case 'lua':
+          codeEl.textContent = generateLuaData(data);
+          break;
+      }
+    }
+
+    function generateMapData() {
+      return {
+        world: {
+          width: worldWidth,
+          height: worldHeight
+        },
+        playerSpawn: playerSpawn,
+        walls: walls.map(w => ({
+          x: Math.round(w.x),
+          y: Math.round(w.y),
+          w: Math.round(w.w),
+          h: Math.round(w.h),
+          type: w.type
+        })),
+        // 额外导出格式兼容
+        wallConstants: {
+          WALL_TYPE: { LOW: 'low', MID: 'mid', HIGH: 'high' },
+          WALL_COLORS: { low: '#6b8e4e', mid: '#9a9a9a', high: '#5a5a8e' },
+          WALL_BLOCKS_DIRECT: { low: false, mid: true, high: true },
+          WALL_BLOCKS_ARCING: { low: false, mid: false, high: true }
+        }
+      };
+    }
+
+    function generateLuaData(data) {
+      let lua = `-- 地图数据 - ${new Date().toLocaleDateString()}
+local MAP_DATA = {
+  world = {
+    width = ${data.world.width},
+    height = ${data.world.height}
+  },
+  playerSpawn = {
+    x = ${Math.round(data.playerSpawn.x)},
+    y = ${Math.round(data.playerSpawn.y)}
+  },
+  walls = {
+`;
+      
+      data.walls.forEach(w => {
+        lua += `    { x = ${w.x}, y = ${w.y}, w = ${w.w}, h = ${w.h}, type = "${w.type}" },\n`;
+      });
+      
+      lua += `  }
+}
+
+return MAP_DATA`;
+      return lua;
+    }
+
+    function copyToClipboard() {
+      const code = document.getElementById('exportCode').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        const btn = document.getElementById('btnCopy');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span>✓</span> 已复制!';
+        setTimeout(() => btn.innerHTML = originalText, 2000);
+      });
+    }
+
+    function downloadFile() {
+      const code = document.getElementById('exportCode').textContent;
+      const format = document.querySelector('.export-tab.active').dataset.format;
+      const extensions = { json: 'json', js: 'js', lua: 'lua' };
+      
+      const blob = new Blob([code], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `map_data.${extensions[format]}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ==================== 键盘快捷键 ====================
+    
+    function handleKeyDown(e) {
+      // 如果在输入框中不响应
+      if (e.target.tagName === 'INPUT') return;
+      
+      switch (e.key) {
+        case '1':
+          selectWallType('low');
+          break;
+        case '2':
+          selectWallType('mid');
+          break;
+        case '3':
+          selectWallType('high');
+          break;
+        case 'r':
+        case 'R':
+          selectTool('rect');
+          break;
+        case 'l':
+        case 'L':
+          selectTool('line');
+          break;
+        case 'e':
+        case 'E':
+          selectTool('erase');
+          break;
+        case 'p':
+        case 'P':
+          // 移动玩家出生点到中心
+          playerSpawn = { x: worldWidth / 2, y: worldHeight / 2 };
+          render();
+          break;
+        case 'Delete':
+        case 'Backspace':
+          if (selectedWallIndex !== -1) {
+            walls.splice(selectedWallIndex, 1);
+            selectedWallIndex = -1;
+            updateWallsList();
+            render();
+          }
+          break;
+        case 'Escape':
+          hideExportModal();
+          selectedWallIndex = -1;
+          render();
+          break;
+      }
+    }
+
+    function selectWallType(type) {
+      selectedWallType = type;
+      document.querySelectorAll('.wall-type-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === type);
+      });
+      updatePreviewInfo();
+    }
+
+    function selectTool(tool) {
+      currentTool = tool;
+      document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tool === tool);
+      });
+      updatePreviewInfo();
+    }
+
+    // ==================== 启动 ====================
+    
+    init();
+  </script>
+</body>
+</html>

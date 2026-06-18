@@ -44,6 +44,14 @@ function init() {
   ensureActiveSkillIcon();
   ensurePauseBtn();
   generateWalls();
+
+  // 应用地图加载的出生点（如果有）
+  if (window._pendingPlayerSpawn) {
+    player.x = window._pendingPlayerSpawn.x;
+    player.y = window._pendingPlayerSpawn.y;
+    window._pendingPlayerSpawn = null;
+  }
+
   // 检查玩家是否在墙体内，若在则向外移动
   let stuckInWall = false;
   for (let w of walls) {

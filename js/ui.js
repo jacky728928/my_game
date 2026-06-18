@@ -461,6 +461,14 @@ function openPauseMenu() {
     }
   });
 
+  const mapBtn = document.createElement('div');
+  mapBtn.className = 'pm-btn pm-map';
+  mapBtn.textContent = '🗺 选择地图';
+  mapBtn.addEventListener('click', () => {
+    closePauseMenu();
+    openMapSelectMenu();
+  });
+
   const hint = document.createElement('div');
   hint.className = 'pm-hint';
   hint.textContent = '电脑：按 ESC 切换暂停 / 继续\n手机：点击右上角按钮切换暂停';
@@ -469,8 +477,9 @@ function openPauseMenu() {
   container.appendChild(sub);
   container.appendChild(stats);
   container.appendChild(resumeBtn);
-  container.appendChild(restartBtn);
+  container.appendChild(mapBtn);
   container.appendChild(debugBtn);
+  container.appendChild(restartBtn);
   container.appendChild(hint);
   document.body.appendChild(container);
   _pauseMenu = container;
@@ -481,4 +490,247 @@ function closePauseMenu() {
   if (_pauseMenu.parentNode) _pauseMenu.parentNode.removeChild(_pauseMenu);
   _pauseMenu = null;
   gamePaused = false;
+}
+
+// ========== 地图选择菜单 ==========
+let _mapSelectMenu = null;
+
+// 地图列表（由 Python 脚本自动生成）
+// 运行: python map_index_generator.py
+const MAP_LIST = []; // 动态加载，见 loadMapList()
+
+// 地图列表加载器（自动从 map_index.json 读取）
+let _mapListLoaded = false;
+async function loadMapList() {
+  if (_mapListLoaded) return MAP_LIST;
+  try {
+    const res = await fetch('地图/map_index.json');
+    if (res.ok) {
+      const data = await res.json();
+      MAP_LIST.length = 0;
+      MAP_LIST.push(...(data.maps || []));
+      _mapListLoaded = true;
+    }
+  } catch (e) {
+    console.warn('无法加载地图列表:', e);
+  }
+  return MAP_LIST;
+}
+
+function openMapSelectMenu() {
+  if (_mapSelectMenu) return;
+  gamePaused = true;
+
+  const container = document.createElement('div');
+  container.id = 'mapSelectMenu';
+  container.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:650;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;color:#fff;user-select:none';
+
+  const title = document.createElement('div');
+  title.textContent = '🗺 选择地图';
+  title.style.cssText = 'font-size:28px;font-weight:bold;color:#58a6ff;margin-bottom:8px;text-shadow:0 2px 8px rgba(0,0,0,.6)';
+
+  const sub = document.createElement('div');
+  sub.id = 'mapSelectSub';
+  sub.textContent = '正在加载地图...';
+  sub.style.cssText = 'font-size:13px;color:#888;margin-bottom:28px';
+
+  const mapGrid = document.createElement('div');
+  mapGrid.id = 'mapGrid';
+  mapGrid.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;justify-content:center;max-width:750px;max-height:60vh;overflow-y:auto;padding:10px;';
+  mapGrid.style.scrollbarWidth = 'thin';
+  mapGrid.style.scrollbarColor = '#30363d #161b22';
+
+  const backBtn = document.createElement('div');
+  backBtn.style.cssText = 'padding:12px 28px;border:2px solid #555;border-radius:8px;background:rgba(26,26,46,.85);cursor:pointer;font-size:14px;color:#aaa;transition:all .15s';
+  backBtn.textContent = '← 返回暂停菜单';
+  backBtn.onmouseenter = () => { backBtn.style.borderColor = '#888'; backBtn.style.color = '#fff'; };
+  backBtn.onmouseleave = () => { backBtn.style.borderColor = '#555'; backBtn.style.color = '#aaa'; };
+  backBtn.onclick = () => closeMapSelectMenu();
+
+  container.appendChild(title);
+  container.appendChild(sub);
+  container.appendChild(mapGrid);
+  container.appendChild(backBtn);
+  document.body.appendChild(container);
+  _mapSelectMenu = container;
+
+  // 异步加载地图列表并渲染
+  loadMapList().then(maps => {
+    const grid = document.getElementById('mapGrid');
+    const subEl = document.getElementById('mapSelectSub');
+    if (!grid || !subEl) return;
+    grid.innerHTML = '';
+    if (maps.length === 0) {
+      subEl.textContent = '未找到地图文件，请先使用地图编辑器创建地图';
+      return;
+    }
+    subEl.textContent = '选择后将加载新地图并重新开始';
+    maps.forEach((map) => {
+      const card = document.createElement('div');
+      card.style.cssText = 'width:360px;padding:12px;border:2px solid #30363d;border-radius:12px;background:rgba(26,26,46,.9);cursor:pointer;transition:all .15s;text-align:center';
+      card.onmouseenter = () => { card.style.transform = 'translateY(-3px)'; card.style.borderColor = '#58a6ff'; card.style.boxShadow = '0 4px 16px rgba(88,166,255,.3)'; };
+      card.onmouseleave = () => { card.style.transform = 'translateY(0)'; card.style.borderColor = '#30363d'; card.style.boxShadow = 'none'; };
+      card.onclick = () => loadMapAndRestart(map.path);
+
+      // 地图预览 Canvas - 增大尺寸
+      const previewCanvas = document.createElement('canvas');
+      previewCanvas.width = 340;
+      previewCanvas.height = 180;
+      previewCanvas.style.cssText = 'border-radius:6px;margin-bottom:10px;background:#0a0c10;display:block;margin-left:auto;margin-right:auto;';
+      renderMapPreview(previewCanvas, map);
+
+      const name = document.createElement('div');
+      name.textContent = map.name || '未命名地图';
+      name.style.cssText = 'font-size:14px;font-weight:bold;color:#e6edf3;margin-bottom:2px';
+
+      const desc = document.createElement('div');
+      const walls = map.wallCount ? `${map.wallCount}个墙体` : '';
+      desc.textContent = walls;
+      desc.style.cssText = 'font-size:11px;color:#777';
+
+      card.appendChild(previewCanvas);
+      card.appendChild(name);
+      card.appendChild(desc);
+      grid.appendChild(card);
+    });
+  });
+}
+
+// 渲染地图预览
+function renderMapPreview(canvas, mapData) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // 清空画布 - 使用深色背景带网格
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, w, h);
+
+  // 计算缩放比例 - 让地图尽可能填满预览区域
+  const mapW = mapData.width || 1600;
+  const mapH = mapData.height || 900;
+  const padding = 8;
+  const availableW = w - padding * 2;
+  const availableH = h - padding * 2;
+  const scale = Math.min(availableW / mapW, availableH / mapH);
+  const offsetX = (w - mapW * scale) / 2;
+  const offsetY = (h - mapH * scale) / 2;
+
+  // 绘制网格背景
+  ctx.strokeStyle = '#1a1f26';
+  ctx.lineWidth = 0.5;
+  const gridSize = 40 * scale;
+  for (let x = offsetX; x < offsetX + mapW * scale; x += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(x, offsetY);
+    ctx.lineTo(x, offsetY + mapH * scale);
+    ctx.stroke();
+  }
+  for (let y = offsetY; y < offsetY + mapH * scale; y += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(offsetX, y);
+    ctx.lineTo(offsetX + mapW * scale, y);
+    ctx.stroke();
+  }
+
+  // 绘制地图边界
+  ctx.strokeStyle = '#30363d';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(offsetX, offsetY, mapW * scale, mapH * scale);
+
+  // 墙体颜色
+  const wallColors = {
+    low: { fill: 'rgba(107,142,78,0.8)', stroke: '#8ab066' },
+    mid: { fill: 'rgba(154,154,154,0.8)', stroke: '#b8b8b8' },
+    high: { fill: 'rgba(90,90,142,0.8)', stroke: '#7878b8' }
+  };
+
+  // 绘制墙体
+  if (mapData.walls && mapData.walls.length > 0) {
+    mapData.walls.forEach(wall => {
+      const colors = wallColors[wall.type] || wallColors.mid;
+      const x = offsetX + wall.x * scale;
+      const y = offsetY + wall.y * scale;
+      const wallW = wall.w * scale;
+      const wallH = wall.h * scale;
+
+      ctx.fillStyle = colors.fill;
+      ctx.fillRect(x, y, wallW, wallH);
+      ctx.strokeStyle = colors.stroke;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, wallW, wallH);
+    });
+  }
+
+  // 绘制玩家出生点
+  if (mapData.spawnX && mapData.spawnY) {
+    const px = offsetX + mapData.spawnX * scale;
+    const py = offsetY + mapData.spawnY * scale;
+    // 外圈
+    ctx.beginPath();
+    ctx.arc(px, py, 6, 0, Math.PI * 2);
+    ctx.strokeStyle = '#3fb950';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // 内圈
+    ctx.beginPath();
+    ctx.arc(px, py, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#3fb950';
+    ctx.fill();
+  }
+}
+
+function closeMapSelectMenu() {
+  if (!_mapSelectMenu) return;
+  if (_mapSelectMenu.parentNode) _mapSelectMenu.parentNode.removeChild(_mapSelectMenu);
+  _mapSelectMenu = null;
+  gamePaused = false;
+}
+
+async function loadMapAndRestart(mapPath) {
+  try {
+    // 显示加载提示
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'mapLoadingOverlay';
+    loadingOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;color:#fff';
+    loadingOverlay.innerHTML = '<div style="font-size:24px;margin-bottom:12px">🗺</div><div>正在加载地图...</div><div id="mapLoadingProgress" style="font-size:12px;color:#888;margin-top:8px">准备中</div>';
+    document.body.appendChild(loadingOverlay);
+
+    closeMapSelectMenu();
+
+    // 加载地图数据
+    const progress = document.getElementById('mapLoadingProgress');
+    progress.textContent = '正在获取地图数据...';
+
+    const response = await fetch(mapPath);
+    if (!response.ok) throw new Error('地图加载失败');
+
+    const mapData = await response.json();
+    progress.textContent = '正在解析地图数据...';
+
+    // 保存地图数据到全局变量，供 init() 使用
+    window._pendingMapData = mapData;
+
+    // 应用世界尺寸（立即生效，供后续使用）
+    if (mapData.world) {
+      window.WORLD_W = mapData.world.width;
+      window.WORLD_H = mapData.world.height;
+    }
+
+    progress.textContent = '即将重新开始...';
+
+    // 短暂延迟后重新开始游戏
+    setTimeout(() => {
+      if (loadingOverlay.parentNode) loadingOverlay.parentNode.removeChild(loadingOverlay);
+      if (typeof restart === 'function') restart();
+    }, 300);
+
+  } catch (error) {
+    console.error('地图加载失败:', error);
+    alert('地图加载失败: ' + error.message);
+    if (document.getElementById('mapLoadingOverlay')) {
+      document.getElementById('mapLoadingOverlay').parentNode.removeChild(document.getElementById('mapLoadingOverlay'));
+    }
+    gamePaused = false;
+  }
 }
