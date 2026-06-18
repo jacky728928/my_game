@@ -447,6 +447,20 @@ function openPauseMenu() {
     if (typeof restart === 'function') restart();
   });
 
+  const debugBtn = document.createElement('div');
+  debugBtn.className = 'pm-btn pm-debug';
+  debugBtn.textContent = '🔧 开发者面板';
+  debugBtn.addEventListener('click', () => {
+    if (typeof createDevPanel === 'function') {
+      if (typeof devPanel !== 'undefined' && devPanel) {
+        devPanel.style.display = devPanel.style.display === 'none' ? 'block' : 'none';
+      } else {
+        createDevPanel();
+      }
+      // 不关闭暂停菜单：开发者面板 z-index 700 高于暂停菜单 600，自然覆盖显示
+    }
+  });
+
   const hint = document.createElement('div');
   hint.className = 'pm-hint';
   hint.textContent = '电脑：按 ESC 切换暂停 / 继续\n手机：点击右上角按钮切换暂停';
@@ -456,6 +470,7 @@ function openPauseMenu() {
   container.appendChild(stats);
   container.appendChild(resumeBtn);
   container.appendChild(restartBtn);
+  container.appendChild(debugBtn);
   container.appendChild(hint);
   document.body.appendChild(container);
   _pauseMenu = container;

@@ -73,6 +73,32 @@ class Renderer {
     ctx.lineWidth = 2;
     ctx.strokeRect(-camX + cx, -camY + cy, WORLD_W, WORLD_H);
 
+    // 墙体
+    for (let w of walls) {
+      const wx = w.x - camX + cx;
+      const wy = w.y - camY + cy;
+      // 简单裁剪：完全在屏幕外的不画
+      if (wx + w.w < 0 || wx > this.w || wy + w.h < 0 || wy > this.h) continue;
+      const wallColor = WALL_COLORS[w.type] || '#7a7a7a';
+      ctx.fillStyle = wallColor;
+      ctx.fillRect(wx, wy, w.w, w.h);
+      // 描边
+      if (w.type === WALL_TYPE.HIGH) {
+        ctx.strokeStyle = '#8a8aff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(wx, wy, w.w, w.h);
+      } else if (w.type === WALL_TYPE.MID) {
+        ctx.strokeStyle = '#555555';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(wx, wy, w.w, w.h);
+      } else {
+        // 矮墙：更细的深绿色描边
+        ctx.strokeStyle = '#3a4e2a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(wx, wy, w.w, w.h);
+      }
+    }
+
     // 攻击范围
     ctx.strokeStyle = COLOR_RANGE;
     ctx.lineWidth = 1.5;

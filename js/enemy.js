@@ -25,8 +25,12 @@ class Enemy {
     if (dist < 1) return;
     const nx = dx / dist;
     const ny = dy / dist;
-    this.x += nx * this.speed * dt;
-    this.y += ny * this.speed * dt;
+    const nextX = this.x + nx * this.speed * dt;
+    const nextY = this.y + ny * this.speed * dt;
+    // 墙体碰撞修正
+    const resolved = resolveCircleWalls(this.x, this.y, this.radius, nextX, nextY);
+    this.x = resolved.x;
+    this.y = resolved.y;
   }
 
   takeDamage(dmg) {

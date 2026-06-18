@@ -6,7 +6,7 @@ function createDevPanel() {
   
   const panel = document.createElement('div');
   panel.id = 'devPanel';
-  panel.style.cssText = 'position:fixed;top:12px;right:12px;background:rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:12px;font-family:Arial,sans-serif;color:#fff;font-size:12px;z-index:400;user-select:none;min-width:140px;' + (window.innerWidth < 600 ? 'top:64px!important;right:12px!important;' : '');
+  panel.style.cssText = 'position:fixed;top:12px;right:12px;background:rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:12px;font-family:Arial,sans-serif;color:#fff;font-size:12px;z-index:700;user-select:none;min-width:140px;' + (window.innerWidth < 600 ? 'top:64px!important;right:12px!important;' : '');
   
   const title = document.createElement('div');
   title.textContent = '🔧 开发者面板';
@@ -103,6 +103,19 @@ function createDevPanel() {
   };
   panel.appendChild(spawnMulBtn);
 
+  const stopSpawnBtn = document.createElement('button');
+  const updateStopSpawnText = () => {
+    stopSpawnBtn.textContent = window._spawnPaused ? '▶ 恢复出怪' : '⏸ 停止出怪';
+    stopSpawnBtn.style.background = window._spawnPaused ? '#27ae60' : '#8e44ad';
+  };
+  updateStopSpawnText();
+  stopSpawnBtn.style.cssText += 'width:100%;margin-bottom:6px;padding:6px 10px;border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:11px;';
+  stopSpawnBtn.onclick = () => {
+    window._spawnPaused = !window._spawnPaused;
+    updateStopSpawnText();
+  };
+  panel.appendChild(stopSpawnBtn);
+
   const sep = document.createElement('hr');
   sep.style.cssText = 'width:100%;border:none;border-top:1px solid rgba(255,255,255,0.2);margin:8px 0;';
   panel.appendChild(sep);
@@ -172,12 +185,3 @@ function createDevPanel() {
   devPanel = panel;
 }
 
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'd' || e.key === 'D') {
-    if (devPanel) {
-      devPanel.style.display = devPanel.style.display === 'none' ? 'block' : 'none';
-    } else {
-      createDevPanel();
-    }
-  }
-});

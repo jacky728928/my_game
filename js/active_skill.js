@@ -23,8 +23,39 @@ function getActiveSkillPreview() {
   if (!def) return null;
   if (def.id !== 'blink') return null;
   const [dx, dy] = _getActiveSkillDirection();
-  const newX = Math.max(player.radius, Math.min(WORLD_W - player.radius, player.x + dx * def.blinkDist));
-  const newY = Math.max(player.radius, Math.min(WORLD_H - player.radius, player.y + dy * def.blinkDist));
+  const dist = def.blinkDist;
+  let targetX = player.x + dx * dist;
+  let targetY = player.y + dy * dist;
+  // 只检测落点是否在墙内（路径完全不检测，实现穿墙）
+  // 落点检测所有墙体类型（矮墙/中墙/高墙）
+  let inWall = false;
+  for (let w of walls) {
+    if (circleRectCollide(targetX, targetY, player.radius, w.x, w.y, w.w, w.h)) {
+      inWall = true;
+      break;
+    }
+  }
+  if (inWall) {
+    // 落点在墙内，从落点向玩家方向回退，找最近的合法位置
+    for (let t = 0.95; t >= 0; t -= 0.02) {
+      const sx = player.x + dx * dist * t;
+      const sy = player.y + dy * dist * t;
+      let stillIn = false;
+      for (let w of walls) {
+        if (circleRectCollide(sx, sy, player.radius, w.x, w.y, w.w, w.h)) {
+          stillIn = true;
+          break;
+        }
+      }
+      if (!stillIn) {
+        targetX = sx;
+        targetY = sy;
+        break;
+      }
+    }
+  }
+  const newX = Math.max(player.radius, Math.min(WORLD_W - player.radius, targetX));
+  const newY = Math.max(player.radius, Math.min(WORLD_H - player.radius, targetY));
   return { x: newX, y: newY, aoeRadius: def.aoeRadius, color: def.color, fromX: player.x, fromY: player.y };
 }
 
@@ -43,8 +74,37 @@ function releaseActiveSkillNow() {
 
   if (def.id === 'blink') {
     const dist = def.blinkDist;
-    const newX = Math.max(player.radius, Math.min(WORLD_W - player.radius, player.x + dx * dist));
-    const newY = Math.max(player.radius, Math.min(WORLD_H - player.radius, player.y + dy * dist));
+    // 只检测落点是否在墙内（路径完全不检测，实现穿墙）
+    // 落点检测所有墙体类型（矮墙/中墙/高墙）
+    let targetX = player.x + dx * dist;
+    let targetY = player.y + dy * dist;
+    let inWall = false;
+    for (let w of walls) {
+      if (circleRectCollide(targetX, targetY, player.radius, w.x, w.y, w.w, w.h)) {
+        inWall = true;
+        break;
+      }
+    }
+    if (inWall) {
+      for (let t = 0.95; t >= 0; t -= 0.02) {
+        const sx = player.x + dx * dist * t;
+        const sy = player.y + dy * dist * t;
+        let stillIn = false;
+        for (let w of walls) {
+          if (circleRectCollide(sx, sy, player.radius, w.x, w.y, w.w, w.h)) {
+            stillIn = true;
+            break;
+          }
+        }
+        if (!stillIn) {
+          targetX = sx;
+          targetY = sy;
+          break;
+        }
+      }
+    }
+    const newX = Math.max(player.radius, Math.min(WORLD_W - player.radius, targetX));
+    const newY = Math.max(player.radius, Math.min(WORLD_H - player.radius, targetY));
     const oldX = player.x;
     const oldY = player.y;
     player.x = newX;
@@ -103,15 +163,49 @@ function releaseActiveSkillNow() {
     cameraFlash.elapsed = 0;
   } else if (def.id === 'dash') {
     const dist = def.dashDist;
-    const dashSteps = 6;
-    const stepDist = dist / dashSteps;
-    for (let i = 1; i <= dashSteps; i++) {
-      player.x += dx * stepDist;
-      player.y += dy * stepDist;
-      player.x = Math.max(player.radius, Math.min(WORLD_W - player.radius, player.x));
-      player.y = Math.max(player.radius, Math.min(WORLD_H - player.radius, player.y));
-      particles.push({ x: player.x, y: player.y, vx: 0, vy: 0, life: 0.4, maxLife: 0.4, color: '#3498db', radius: 5 });
+    // 只检测落点是否在墙内（路径完全不检测，实现穿越）
+    // 落点检测所有墙体类型（矮墙/中墙/高墙）
+    let targetX = player.x + dx * dist;
+    let targetY = player.y + dy * dist;
+    let inWall = false;
+    for (let w of walls) {
+      if (circleRectCollide(targetX, targetY, player.radius, w.x, w.y, w.w, w.h)) {
+        inWall = true;
+        break;
+      }
     }
+    if (inWall) {
+      for (let t = 0.95; t >= 0; t -= 0.02) {
+        const sx = player.x + dx * dist * t;
+        const sy = player.y + dy * dist * t;
+        let stillIn = false;
+        for (let w of walls) {
+          if (circleRectCollide(sx, sy, player.radius, w.x, w.y, w.w, w.h)) {
+            stillIn = true;
+            break;
+          }
+        }
+        if (!stillIn) {
+          targetX = sx;
+          targetY = sy;
+          break;
+        }
+      }
+    }
+    targetX = Math.max(player.radius, Math.min(WORLD_W - player.radius, targetX));
+    targetY = Math.max(player.radius, Math.min(WORLD_H - player.radius, targetY));
+    // 沿路径生成冲刺粒子
+    const dashSteps = 8;
+    const stepDist = Math.sqrt(
+      Math.pow(targetX - player.x, 2) + Math.pow(targetY - player.y, 2)
+    ) / dashSteps;
+    for (let i = 1; i <= dashSteps; i++) {
+      const tx = player.x + (targetX - player.x) * (i / dashSteps);
+      const ty = player.y + (targetY - player.y) * (i / dashSteps);
+      particles.push({ x: tx, y: ty, vx: 0, vy: 0, life: 0.4, maxLife: 0.4, color: '#3498db', radius: 5 });
+    }
+    player.x = targetX;
+    player.y = targetY;
     player.startInvuln(def.invulnTime);
   } else if (def.id === 'haste') {
     player.activeSkillBuff = {

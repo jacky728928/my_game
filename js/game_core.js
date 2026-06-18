@@ -43,6 +43,46 @@ function init() {
   closePauseMenu();
   ensureActiveSkillIcon();
   ensurePauseBtn();
+  generateWalls();
+  // 检查玩家是否在墙体内，若在则向外移动
+  let stuckInWall = false;
+  for (let w of walls) {
+    if (w.type === WALL_TYPE.HIGH || w.type === WALL_TYPE.MID) {
+      if (circleRectCollide(player.x, player.y, player.radius, w.x, w.y, w.w, w.h)) {
+        stuckInWall = true;
+        break;
+      }
+    }
+  }
+  if (stuckInWall) {
+    // 沿8个方向找最近的空位
+    const dirs = [
+      [1, 0], [-1, 0], [0, 1], [0, -1],
+      [1, 1], [-1, 1], [1, -1], [-1, -1],
+    ];
+    let found = false;
+    for (let step = 30; step <= 400 && !found; step += 20) {
+      for (let d of dirs) {
+        const tx = player.x + d[0] * step;
+        const ty = player.y + d[1] * step;
+        let inWall = false;
+        for (let w of walls) {
+          if (w.type === WALL_TYPE.HIGH || w.type === WALL_TYPE.MID) {
+            if (circleRectCollide(tx, ty, player.radius, w.x, w.y, w.w, w.h)) {
+              inWall = true;
+              break;
+            }
+          }
+        }
+        if (!inWall && tx > 50 && tx < WORLD_W - 50 && ty > 50 && ty < WORLD_H - 50) {
+          player.x = tx;
+          player.y = ty;
+          found = true;
+          break;
+        }
+      }
+    }
+  }
   openModeSelectUi();
 }
 
@@ -54,18 +94,33 @@ function spawnEnemy() {
   const right = player.x + vw / 2 + margin;
   const top = player.y - vh / 2 - margin;
   const bottom = player.y + vh / 2 + margin;
-  const L = Math.max(0, left);
-  const R = Math.min(WORLD_W, right);
-  const T = Math.max(0, top);
-  const B = Math.min(WORLD_H, bottom);
+  const L = Math.max(50, left);
+  const R = Math.min(WORLD_W - 50, right);
+  const T = Math.max(50, top);
+  const B = Math.min(WORLD_H - 50, bottom);
 
   let x, y;
-  const edge = Math.floor(Math.random() * 4);
-  switch (edge) {
-    case 0: x = L + Math.random() * (R - L); y = T; break;
-    case 1: x = L + Math.random() * (R - L); y = B; break;
-    case 2: x = L; y = T + Math.random() * (B - T); break;
-    case 3: x = R; y = T + Math.random() * (B - T); break;
+  let attempts = 0;
+  while (attempts < 10) {
+    const edge = Math.floor(Math.random() * 4);
+    switch (edge) {
+      case 0: x = L + Math.random() * (R - L); y = T; break;
+      case 1: x = L + Math.random() * (R - L); y = B; break;
+      case 2: x = L; y = T + Math.random() * (B - T); break;
+      case 3: x = R; y = T + Math.random() * (B - T); break;
+    }
+    // 检查生成点是否在墙体内，若在则重新生成
+    let inWall = false;
+    for (let w of walls) {
+      if (w.type === WALL_TYPE.HIGH || w.type === WALL_TYPE.MID) {
+        if (x >= w.x - 20 && x <= w.x + w.w + 20 && y >= w.y - 20 && y <= w.y + w.h + 20) {
+          inWall = true;
+          break;
+        }
+      }
+    }
+    if (!inWall) break;
+    attempts++;
   }
 
   const elapsed = gameTime / 60;
@@ -154,14 +209,16 @@ function update(dt) {
   }
   damageNumbers = damageNumbers.filter(d => d.life > 0);
 
-  spawnTimer -= dt;
-  if (spawnTimer <= 0) {
-    const mult = window._spawnRateMultiplier || 1;
-    for (let i = 0; i < mult; i++) spawnEnemy();
-    gameTime += spawnInterval;
-    spawnInterval = Math.max(SPAWN_INTERVAL_MIN,
-      SPAWN_INTERVAL_INIT - gameTime * SPAWN_INTERVAL_DECAY);
-    spawnTimer = spawnInterval / mult;
+  if (!window._spawnPaused) {
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+      const mult = window._spawnRateMultiplier || 1;
+      for (let i = 0; i < mult; i++) spawnEnemy();
+      gameTime += spawnInterval;
+      spawnInterval = Math.max(SPAWN_INTERVAL_MIN,
+        SPAWN_INTERVAL_INIT - gameTime * SPAWN_INTERVAL_DECAY);
+      spawnTimer = spawnInterval / mult;
+    }
   }
 }
 

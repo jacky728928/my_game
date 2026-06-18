@@ -184,10 +184,26 @@ function updateSecondaryWeapons(dt) {
   }
 
   for (let s of shells) {
+    const prevX = s.x;
+    const prevY = s.y;
     s.flyElapsed += dt;
     const t = Math.min(1, s.flyElapsed / s.flyTime);
     s.x = s.startX + (s.targetX - s.startX) * t;
     s.y = s.startY + (s.targetY - s.startY) * t;
+    // 抛射物碰撞高墙检测
+    const hitWall = checkArcingProjectileWalls(s.x, s.y, 8);
+    if (hitWall) {
+      s.exploded = true;
+      applyAoeDamage(s.x, s.y, s.aoeRadius, s.dmg);
+      createExplosion(s.x, s.y, s.aoeRadius, s.color);
+      explosions.push({
+        x: s.x, y: s.y,
+        radius: 0, maxRadius: s.aoeRadius * 1.6,
+        life: 0.6, maxLife: 0.6,
+        color: '#ffffff', type: 'big',
+      });
+      continue;
+    }
     if (Math.random() < 0.85) {
       particles.push({
         type: 'trail',
@@ -222,6 +238,27 @@ function updateSecondaryWeapons(dt) {
       const t = Math.min(1, g.flyElapsed / g.flyTime);
       g.x = g.startX + (g.targetX - g.startX) * t;
       g.y = g.startY + (g.targetY - g.startY) * t;
+      // 抛射物碰撞高墙检测
+      const hitWall = checkArcingProjectileWalls(g.x, g.y, 8);
+      if (hitWall) {
+        g.landed = true;
+        g.fuseElapsed = 0;
+        for (let i = 0; i < 8; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const s = 40 + Math.random() * 50;
+          particles.push({
+            type: 'debris',
+            x: g.x, y: g.y,
+            vx: Math.cos(a) * s,
+            vy: Math.sin(a) * s,
+            size: 2 + Math.random() * 2,
+            life: 0.3 + Math.random() * 0.2,
+            maxLife: 0.5,
+            color: '#aaaaaa',
+            drag: 2.5,
+          });
+        }
+      }
       if (Math.random() < 0.6) {
         particles.push({
           type: 'trail',

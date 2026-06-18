@@ -38,6 +38,17 @@ class Minimap {
       ctx.fillRect(ex - 1.5, ey - 1.5, 3, 3);
     }
 
+    // 墙体（简化显示）
+    for (let w of walls) {
+      const wx = w.x * this.scaleX;
+      const wy = w.y * this.scaleY;
+      const ww = w.w * this.scaleX;
+      const wh = w.h * this.scaleY;
+      if (ww < 1 && wh < 1) continue;
+      ctx.fillStyle = WALL_COLORS[w.type] + '99' || 'rgba(120,120,120,0.6)';
+      ctx.fillRect(wx, wy, Math.max(ww, 1), Math.max(wh, 1));
+    }
+
     // 玩家
     const px = player.x * this.scaleX;
     const py = player.y * this.scaleY;

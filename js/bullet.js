@@ -13,12 +13,31 @@ class Bullet {
   }
 
   update(dt) {
+    const prevX = this.x;
+    const prevY = this.y;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     this.life -= dt;
     if (this.life <= 0) this.alive = false;
     if (this.x < -20 || this.x > WORLD_W + 20 || this.y < -20 || this.y > WORLD_H + 20) {
       this.alive = false;
+    }
+    // 子弹与墙体碰撞检测（平射子弹，中/高墙阻挡）
+    const hitWall = checkBulletWalls(prevX, prevY, this.x, this.y);
+    if (hitWall) {
+      this.alive = false;
+      // 在碰撞点生成小的撞击粒子
+      if (typeof particles !== 'undefined') {
+        particles.push({
+          type: 'wall_hit',
+          x: this.x, y: this.y,
+          vx: 0, vy: 0,
+          size: 6,
+          life: 0.2,
+          maxLife: 0.2,
+          color: WALL_COLORS[hitWall.type],
+        });
+      }
     }
   }
 

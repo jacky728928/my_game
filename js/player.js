@@ -60,6 +60,8 @@ class Player {
     if (this.activeSkillBuff && this.activeSkillBuff.id === 'haste' && this.activeSkillBuff.timeLeft > 0) {
       curSpeed = this.speed * this.activeSkillBuff.speedMult;
     }
+    const oldX = this.x;
+    const oldY = this.y;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     // 限制 vx/vy 用 curSpeed 的倍率 — 重新设置为当前输入方向 × 实际速度
@@ -71,6 +73,10 @@ class Player {
         this.vy = this.vy / vMag * curSpeed;
       }
     }
+    // 墙体碰撞修正
+    const resolved = resolveCircleWalls(oldX, oldY, this.radius, this.x, this.y);
+    this.x = resolved.x;
+    this.y = resolved.y;
     this.x = Math.max(this.radius, Math.min(WORLD_W - this.radius, this.x));
     this.y = Math.max(this.radius, Math.min(WORLD_H - this.radius, this.y));
     if (Math.abs(this.vx) > 1 || Math.abs(this.vy) > 1) {

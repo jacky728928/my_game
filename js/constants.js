@@ -141,6 +141,40 @@ const SECONDARY_WEAPON_LIST = [
   SECONDARY_WEAPON_POOL.orbital_cannon,
 ];
 
+// ========== 墙体系统 ==========
+// 三种墙体类型：矮墙（绿色）| 中墙（灰色）| 高墙（暗蓝灰）
+// 阻挡规则：
+//   - 玩家/敌人移动：三种墙全部阻挡
+//   - 手枪子弹（平射）：矮墙穿过，中墙/高墙阻挡
+//   - 榴弹/手雷（抛射）：高墙阻挡，中墙/矮墙穿过
+//   - 天基屠龙炮：无视所有墙体（空对地）
+const WALL_TYPE = {
+  LOW:  'low',   // 矮墙
+  MID:  'mid',   // 中墙
+  HIGH: 'high',  // 高墙
+};
+
+// 墙体颜色
+const WALL_COLORS = {
+  low:  '#6b8e4e',   // 浅绿灰（矮墙，灌木）
+  mid:  '#9a9a9a',   // 亮灰（中墙，混凝土）
+  high: '#5a5a8e',   // 蓝紫灰（高墙）
+};
+
+// 墙体是否阻挡平射子弹（矮墙不挡，中/高墙挡）
+const WALL_BLOCKS_DIRECT = {
+  low:  false,
+  mid:  true,
+  high: true,
+};
+
+// 墙体是否阻挡抛射物（只有高墙挡，矮/中墙不挡）
+const WALL_BLOCKS_ARCING = {
+  low:  false,
+  mid:  false,
+  high: true,
+};
+
 // ========== 主动技能系统 ==========
 // 开局从3个技能中随机3选1
 // 触发方式：手机点击右下角图标 / 电脑按 E 键

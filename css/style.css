@@ -29,4 +29,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#1a1a2e;touch-action
 #pauseMenu .pm-resume:hover{background:rgba(46,204,113,.3)}
 #pauseMenu .pm-restart{background:rgba(231,76,60,.15);border-color:#e74c3c;color:#e74c3c}
 #pauseMenu .pm-restart:hover{background:rgba(231,76,60,.3)}
+#pauseMenu .pm-debug{background:rgba(241,196,15,.15);border-color:#f1c40f;color:#f1c40f}
+#pauseMenu .pm-debug:hover{background:rgba(241,196,15,.3)}
 #pauseMenu .pm-hint{margin-top:20px;font-size:11px;color:#777;text-align:center;line-height:1.6}
