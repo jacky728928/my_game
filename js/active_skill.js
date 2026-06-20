@@ -15,6 +15,30 @@ function _getActiveSkillDirection() {
   return [dx, dy];
 }
 
+function _resolveBlinkTarget(dx, dy, dist) {
+  let tx = player.x + dx * dist;
+  let ty = player.y + dy * dist;
+  const inWall = walls.some(w =>
+    circleRectCollide(tx, ty, player.radius, w.x, w.y, w.w, w.h)
+  );
+  if (inWall) {
+    for (let t = 0.95; t >= 0; t -= 0.02) {
+      const sx = player.x + dx * dist * t;
+      const sy = player.y + dy * dist * t;
+      if (!walls.some(w =>
+        circleRectCollide(sx, sy, player.radius, w.x, w.y, w.w, w.h)
+      )) {
+        tx = sx;
+        ty = sy;
+        break;
+      }
+    }
+  }
+  tx = Math.max(player.radius, Math.min(WORLD_W - player.radius, tx));
+  ty = Math.max(player.radius, Math.min(WORLD_H - player.radius, ty));
+  return { x: tx, y: ty };
+}
+
 function getActiveSkillPreview() {
   if (!_activeSkillCharging) return null;
   if (!player || !player.alive) return null;
@@ -23,39 +47,7 @@ function getActiveSkillPreview() {
   if (!def) return null;
   if (def.id !== 'blink') return null;
   const [dx, dy] = _getActiveSkillDirection();
-  const dist = def.blinkDist;
-  let targetX = player.x + dx * dist;
-  let targetY = player.y + dy * dist;
-  // 只检测落点是否在墙内（路径完全不检测，实现穿墙）
-  // 落点检测所有墙体类型（矮墙/中墙/高墙）
-  let inWall = false;
-  for (let w of walls) {
-    if (circleRectCollide(targetX, targetY, player.radius, w.x, w.y, w.w, w.h)) {
-      inWall = true;
-      break;
-    }
-  }
-  if (inWall) {
-    // 落点在墙内，从落点向玩家方向回退，找最近的合法位置
-    for (let t = 0.95; t >= 0; t -= 0.02) {
-      const sx = player.x + dx * dist * t;
-      const sy = player.y + dy * dist * t;
-      let stillIn = false;
-      for (let w of walls) {
-        if (circleRectCollide(sx, sy, player.radius, w.x, w.y, w.w, w.h)) {
-          stillIn = true;
-          break;
-        }
-      }
-      if (!stillIn) {
-        targetX = sx;
-        targetY = sy;
-        break;
-      }
-    }
-  }
-  const newX = Math.max(player.radius, Math.min(WORLD_W - player.radius, targetX));
-  const newY = Math.max(player.radius, Math.min(WORLD_H - player.radius, targetY));
+  const { x: newX, y: newY } = _resolveBlinkTarget(dx, dy, def.blinkDist);
   return { x: newX, y: newY, aoeRadius: def.aoeRadius, color: def.color, fromX: player.x, fromY: player.y };
 }
 
@@ -73,38 +65,7 @@ function releaseActiveSkillNow() {
   const [dx, dy] = _getActiveSkillDirection();
 
   if (def.id === 'blink') {
-    const dist = def.blinkDist;
-    // 只检测落点是否在墙内（路径完全不检测，实现穿墙）
-    // 落点检测所有墙体类型（矮墙/中墙/高墙）
-    let targetX = player.x + dx * dist;
-    let targetY = player.y + dy * dist;
-    let inWall = false;
-    for (let w of walls) {
-      if (circleRectCollide(targetX, targetY, player.radius, w.x, w.y, w.w, w.h)) {
-        inWall = true;
-        break;
-      }
-    }
-    if (inWall) {
-      for (let t = 0.95; t >= 0; t -= 0.02) {
-        const sx = player.x + dx * dist * t;
-        const sy = player.y + dy * dist * t;
-        let stillIn = false;
-        for (let w of walls) {
-          if (circleRectCollide(sx, sy, player.radius, w.x, w.y, w.w, w.h)) {
-            stillIn = true;
-            break;
-          }
-        }
-        if (!stillIn) {
-          targetX = sx;
-          targetY = sy;
-          break;
-        }
-      }
-    }
-    const newX = Math.max(player.radius, Math.min(WORLD_W - player.radius, targetX));
-    const newY = Math.max(player.radius, Math.min(WORLD_H - player.radius, targetY));
+    const { x: newX, y: newY } = _resolveBlinkTarget(dx, dy, def.blinkDist);
     const oldX = player.x;
     const oldY = player.y;
     player.x = newX;
@@ -162,38 +123,7 @@ function releaseActiveSkillNow() {
     cameraFlash.duration = 0.18;
     cameraFlash.elapsed = 0;
   } else if (def.id === 'dash') {
-    const dist = def.dashDist;
-    // 只检测落点是否在墙内（路径完全不检测，实现穿越）
-    // 落点检测所有墙体类型（矮墙/中墙/高墙）
-    let targetX = player.x + dx * dist;
-    let targetY = player.y + dy * dist;
-    let inWall = false;
-    for (let w of walls) {
-      if (circleRectCollide(targetX, targetY, player.radius, w.x, w.y, w.w, w.h)) {
-        inWall = true;
-        break;
-      }
-    }
-    if (inWall) {
-      for (let t = 0.95; t >= 0; t -= 0.02) {
-        const sx = player.x + dx * dist * t;
-        const sy = player.y + dy * dist * t;
-        let stillIn = false;
-        for (let w of walls) {
-          if (circleRectCollide(sx, sy, player.radius, w.x, w.y, w.w, w.h)) {
-            stillIn = true;
-            break;
-          }
-        }
-        if (!stillIn) {
-          targetX = sx;
-          targetY = sy;
-          break;
-        }
-      }
-    }
-    targetX = Math.max(player.radius, Math.min(WORLD_W - player.radius, targetX));
-    targetY = Math.max(player.radius, Math.min(WORLD_H - player.radius, targetY));
+    let { x: targetX, y: targetY } = _resolveBlinkTarget(dx, dy, def.dashDist);
     // 沿路径生成冲刺粒子
     const dashSteps = 8;
     const stepDist = Math.sqrt(
@@ -233,10 +163,6 @@ function onActiveSkillRelease() {
     _activeSkillCharging = false;
     releaseActiveSkillNow();
   }
-}
-
-function triggerActiveSkill() {
-  releaseActiveSkillNow();
 }
 
 function ensureActiveSkillIcon() {

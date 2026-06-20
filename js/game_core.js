@@ -151,6 +151,7 @@ function addDamageNumber(x, y, value, isCrit) {
 function update(dt) {
   if (!player.alive) return;
   if (gamePaused) return;
+  if (window._currentPage && window._currentPage !== 'adventure') return;
 
   elapsedTime += dt;
   const [ix, iy] = input.getDirection();
