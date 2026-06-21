@@ -6,9 +6,7 @@ let weaponAttackDisabled = {
   slot3: false,
 };
 
-function attack() {
-  if (weaponAttackDisabled.primary) return;
-  if (!player.canAttack() || enemies.length === 0) return;
+function _findNearestEnemyInRange() {
   let nearest = null;
   let minDist = player.effectiveAttackRange;
   for (let e of enemies) {
@@ -21,13 +19,72 @@ function attack() {
       nearest = { enemy: e, dist, dx, dy };
     }
   }
-  if (!nearest) return;
+  return nearest;
+}
 
-  player.doAttack();
+function _fireOneBullet(nearest, chargeStacks) {
   const angle = Math.atan2(nearest.dy, nearest.dx);
-  const roll = player.rollAttack();
-  bullets.push(new Bullet(player.x, player.y, angle, roll.damage, roll.isCrit));
+  // 计算子弹最终伤害：
+  // - 单发武器：rollAttack(0) 即基础伤害 × 1
+  // - 三连发：基础 × burstDamageMult；首发射击时若有战术充能，额外 × 1.8
+  const baseDmg = player.effectiveDamage;
+  let dmg = baseDmg * (player.burstDamageMult || 1.0);
+  if (chargeStacks && chargeStacks > 0) {
+    dmg = baseDmg * (1 + player.tacticalCharge.damageBonusMult);
+  }
+  const roll = Math.random() * 100;
+  let isCrit = false;
+  if (roll < player.critChance) {
+    dmg = dmg * player.critMultiplier;
+    isCrit = true;
+  }
+  const b = new Bullet(player.x, player.y, angle, dmg, isCrit);
+  // 应用角色子弹颜色/速度
+  b.color = player.bulletColor || '#f1c40f';
+  b.core = player.bulletCore || '#ffffff';
+  b.vx = Math.cos(angle) * player.bulletSpeed;
+  b.vy = Math.sin(angle) * player.bulletSpeed;
+  b.hasCharge = (chargeStacks && chargeStacks > 0);
+  bullets.push(b);
   player.angle = angle;
+}
+
+function attack() {
+  if (weaponAttackDisabled.primary) return;
+  if (!player.canAttack() || enemies.length === 0) return;
+  // 三连发：开启 burst，第一发立即发射；后续由 update() 中调度
+  if (player.burstTotalShots > 1) {
+    player.startBurst();
+    player.doAttack();
+    // 第一发（从 startBurst 后 shotTimer=0，下一次 update 中会触发；这里为了手感直接发射）
+    const nearest = _findNearestEnemyInRange();
+    if (nearest) {
+      const info = player.consumeBurstShot();
+      _fireOneBullet(nearest, info.chargeStacks);
+    }
+  } else {
+    // 单发：与原逻辑一致
+    const nearest = _findNearestEnemyInRange();
+    if (!nearest) return;
+    player.doAttack();
+    _fireOneBullet(nearest, 0);
+  }
+}
+
+function updateBurst(dt) {
+  if (!player.burstActive || player.burstShotsLeft <= 0) return;
+  player.burstShotTimer -= dt;
+  if (player.burstShotTimer <= 0) {
+    const nearest = _findNearestEnemyInRange();
+    if (nearest) {
+      const info = player.consumeBurstShot();
+      _fireOneBullet(nearest, info.chargeStacks);
+    } else {
+      // 没目标：仍消耗一发（保持节奏）
+      player.consumeBurstShot();
+    }
+    player.burstShotTimer = player.burstShotInterval;
+  }
 }
 
 function findNearestEnemy(maxRange) {

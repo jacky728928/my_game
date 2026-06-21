@@ -122,6 +122,70 @@ function releaseActiveSkillNow() {
     cameraFlash.intensity = 0.25;
     cameraFlash.duration = 0.18;
     cameraFlash.elapsed = 0;
+  } else if (def.id === 'pulse_dash') {
+    // 脉冲冲刺：沿路径快速移动，路径上敌人受伤并被击退；途中霸体
+    let { x: targetX, y: targetY } = _resolveBlinkTarget(dx, dy, def.dashDist);
+    const dashSteps = 10;
+    let lastX = player.x;
+    let lastY = player.y;
+    const stepDist = Math.sqrt(
+      Math.pow(targetX - player.x, 2) + Math.pow(targetY - player.y, 2)
+    ) / dashSteps;
+    const baseDmg = player.effectiveDamage * (def.damageMult || 2.0);
+    const hitSet = new Set();
+    for (let i = 1; i <= dashSteps; i++) {
+      const tx = player.x + (targetX - player.x) * (i / dashSteps);
+      const ty = player.y + (targetY - player.y) * (i / dashSteps);
+      // 路径粒子（蓝紫色能量拖尾）
+      for (let j = 0; j < 3; j++) {
+        particles.push({
+          x: tx + (Math.random() - 0.5) * 10,
+          y: ty + (Math.random() - 0.5) * 10,
+          vx: 0, vy: 0, life: 0.3,
+          maxLife: 0.3,
+          color: def.color || '#8a5cf0',
+          radius: 5,
+        });
+      }
+      // 沿途伤害检测：对半径30px内敌人造成伤害并击退
+      for (let e of enemies) {
+        if (!e.alive) continue;
+        if (hitSet.has(e)) continue;
+        const edx = e.x - tx;
+        const edy = e.y - ty;
+        const dist = Math.sqrt(edx * edx + edy * edy);
+        if (dist <= 30 + e.radius) {
+          e.takeDamage(baseDmg);
+          addDamageNumber(e.x, e.y, baseDmg, true);
+          // 击退
+          if (dist > 0.1) {
+            e.x += (edx / dist) * (def.knockback || 30);
+            e.y += (edy / dist) * (def.knockback || 30);
+          }
+          hitSet.add(e);
+        }
+      }
+      lastX = tx; lastY = ty;
+    }
+    // 落地：大爆发
+    explosions.push({ x: targetX, y: targetY, radius: 0, maxRadius: 60, life: 0.3, maxLife: 0.3, color: def.color || '#8a5cf0', type: 'ring_main' });
+    explosions.push({ x: targetX, y: targetY, radius: 0, maxRadius: 100, life: 0.5, maxLife: 0.5, color: '#bb66ff', type: 'ring_outer' });
+    explosions.push({ x: targetX, y: targetY, radius: 0, maxRadius: 30, life: 0.2, maxLife: 0.2, color: '#ffffff', type: 'flash' });
+    for (let i = 0; i < 16; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 100 + Math.random() * 180;
+      particles.push({
+        x: targetX, y: targetY,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 0.5, maxLife: 0.5, color: def.color || '#8a5cf0', radius: 4
+      });
+    }
+    player.x = targetX;
+    player.y = targetY;
+    player.startInvuln(def.invulnTime);
+    screenShake.intensity = 10;
+    screenShake.duration = 0.25;
+    screenShake.elapsed = 0;
   } else if (def.id === 'dash') {
     let { x: targetX, y: targetY } = _resolveBlinkTarget(dx, dy, def.dashDist);
     // 沿路径生成冲刺粒子

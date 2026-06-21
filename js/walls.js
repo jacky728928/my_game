@@ -9,12 +9,14 @@ function generateWalls() {
   // 检查是否有待加载的地图数据
   if (window._pendingMapData) {
     const mapData = window._pendingMapData;
-    // 应用世界尺寸
+    // 应用世界尺寸（同时更新脚本作用域绑定 + window 属性，双保险）
     if (mapData.world) {
-      window.WORLD_W = mapData.world.width;
-      window.WORLD_H = mapData.world.height;
+      setWorldSize(mapData.world.width, mapData.world.height, 'walls.js: 从 _pendingMapData 加载地图 "' + (mapData.name || '未命名') + '"');
+    } else if (window.LOG) {
+      window.LOG_WARN('地图数据缺少 world 字段，使用默认 2400×2400');
     }
     // 加载墙体
+    let wallCount = 0;
     if (mapData.walls) {
       mapData.walls.forEach(w => {
         walls.push({
@@ -24,17 +26,22 @@ function generateWalls() {
           h: w.h,
           type: w.type || WALL_TYPE.MID
         });
+        wallCount++;
       });
     }
     // 保存玩家出生点
+    let spawnInfo = '';
     if (mapData.playerSpawn) {
       window._pendingPlayerSpawn = { x: mapData.playerSpawn.x, y: mapData.playerSpawn.y };
+      spawnInfo = '出生点(' + mapData.playerSpawn.x + ',' + mapData.playerSpawn.y + ')';
     }
+    if (window.LOG) window.LOG('walls.js: 加载地图完成，墙体表 ' + wallCount + ' 条，' + spawnInfo);
     // 清除待加载数据
     window._pendingMapData = null;
     return;
   }
 
+  if (window.LOG) window.LOG('walls.js: 未检测到 _pendingMapData，使用默认墙体布局（' + WORLD_W + '×' + WORLD_H + '）');
   const cx = WORLD_W / 2;
   const cy = WORLD_H / 2;
 

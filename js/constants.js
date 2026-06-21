@@ -1,6 +1,24 @@
 // ========== 游戏常量 ==========
-const WORLD_W = 2400;
-const WORLD_H = 2400;
+// 注意：WORLD_W / WORLD_H 用 let 而非 const，以便地图选择时动态重赋值
+// （经典 script 中 const 不会挂到 window，且不可重赋值）
+let WORLD_W = 2400;
+let WORLD_H = 2400;
+
+// 统一修改世界尺寸的函数 —— 保证脚本作用域变量 + window 属性同步，且触发日志
+function setWorldSize(w, h, reason) {
+  const oldW = WORLD_W, oldH = WORLD_H;
+  WORLD_W = w;
+  WORLD_H = h;
+  window.WORLD_W = w;
+  window.WORLD_H = h;
+  if (window.LOG) {
+    window.LOG('世界尺寸更新: (' + oldW + '×' + oldH + ') → (' + w + '×' + h + ') 原因: ' + (reason || '未知'));
+  }
+}
+// 显式挂到 window，确保 index.html 内联脚本和其他模块都能访问
+window.setWorldSize = setWorldSize;
+
+if (window.LOG) window.LOG('constants.js 已加载，初始 WORLD=' + WORLD_W + '×' + WORLD_H);
 
 // 玩家
 const PLAYER_RADIUS = 18;
@@ -175,8 +193,73 @@ const WALL_BLOCKS_ARCING = {
   high: true,
 };
 
+// ========== 角色定义 ==========
+const HERO_POOL = {
+  echo01: {
+    id: 'echo01',
+    name: 'Echo-01',
+    title: '战术干员',
+    avatar: 'E01',
+    color: '#8a5cf0',
+    portrait: 'pic/初始角色.png',
+    desc: '精英战术干员，装备等离子冲锋枪，擅长高速连射与脉冲突袭。',
+    stats: {
+      maxHp: PLAYER_MAX_HP,
+      attackBonus: 0,
+      attackRange: PISTOL_RANGE,
+      attackSpeedBonus: 0,
+      bulletSpeed: BULLET_SPEED,
+      critChance: 0,
+    },
+    primary: {
+      type: 'triple',
+      name: '等离子冲锋枪',
+      burstInterval: 1.0,       // 三连发总冷却
+      shotInterval: 0.12,       // 每发之间 0.12s
+      damageMult: 0.4,          // 每发伤害 = 基础 × 0.4
+      range: 260,
+      bulletSpeed: 420,
+      bulletColor: '#8a5cf0',   // 紫蓝色能量弹
+      bulletCore: '#ffffff',
+    },
+    activeSkill: 'pulse_dash',
+    passives: ['tactical_charge', 'field_reflex'],
+  },
+  standard: {
+    id: 'standard',
+    name: '标准干员',
+    title: '新兵',
+    avatar: 'STD',
+    color: '#3498db',
+    portrait: null,
+    desc: '标准训练干员，装备单发手枪，稳定可靠。',
+    stats: {
+      maxHp: PLAYER_MAX_HP,
+      attackBonus: 0,
+      attackRange: PISTOL_RANGE,
+      attackSpeedBonus: 0,
+      bulletSpeed: BULLET_SPEED,
+      critChance: 0,
+    },
+    primary: {
+      type: 'single',
+      name: '标准手枪',
+      burstInterval: PISTOL_INTERVAL,
+      damageMult: 1.0,
+      range: PISTOL_RANGE,
+      bulletSpeed: BULLET_SPEED,
+      bulletColor: '#f1c40f',
+      bulletCore: '#ffffff',
+    },
+    activeSkill: 'blink',
+    passives: [],
+  },
+};
+
+const HERO_LIST = [HERO_POOL.echo01, HERO_POOL.standard];
+
 // ========== 主动技能系统 ==========
-// 开局从3个技能中随机3选1
+// 每个角色绑定一个专属技能，游戏开局直接装备
 // 触发方式：手机点击右下角图标 / 电脑按 E 键
 const ACTIVE_SKILL_POOL = {
   blink: {
@@ -188,6 +271,19 @@ const ACTIVE_SKILL_POOL = {
     aoeRadius: 50,
     color: '#9b59b6',
     icon: '✦',
+  },
+  pulse_dash: {
+    id: 'pulse_dash',
+    name: '脉冲冲刺',
+    desc: '向摇杆方向冲刺 180px，期间霸体；路径上敌人受到基础伤害 × 2 并被击退',
+    cooldown: 6.0,
+    dashDist: 180,
+    invulnTime: 0.5,
+    damageMult: 2.0,
+    knockback: 40,
+    color: '#8a5cf0',
+    icon: '✦',
+    isPulse: true,
   },
   dash: {
     id: 'dash',
@@ -213,6 +309,7 @@ const ACTIVE_SKILL_POOL = {
 
 const ACTIVE_SKILL_LIST = [
   ACTIVE_SKILL_POOL.blink,
+  ACTIVE_SKILL_POOL.pulse_dash,
   ACTIVE_SKILL_POOL.dash,
   ACTIVE_SKILL_POOL.haste,
 ];

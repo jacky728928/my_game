@@ -1,0 +1,727 @@
+/* ============ 主页样式（与游戏样式隔离） ============ */
+
+#homepage-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #0a0a14;
+  overflow: hidden;
+  color: #e0e0e0;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+#homepage-root.hidden { display: none; }
+
+/* 背景层 */
+.hp-bg-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.hp-bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(212, 175, 55, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212, 175, 55, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: hpGridShift 30s linear infinite;
+  opacity: 0.8;
+}
+
+@keyframes hpGridShift {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(50px, 50px); }
+}
+
+.hp-bg-glow {
+  position: absolute;
+  opacity: 0.15;
+  animation: hpGlowFloat 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes hpGlowFloat {
+  0%, 100% { transform: scale(1) translate(0, 0); opacity: 0.15; }
+  50% { transform: scale(1.2) translate(20px, -20px); opacity: 0.22; }
+}
+
+.hp-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hp-particles::before,
+.hp-particles::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #d4af37;
+  border-radius: 50%;
+  box-shadow: 0 0 12px #d4af37;
+  animation: hpParticleFloat 10s linear infinite;
+}
+
+.hp-particles::before {
+  top: 20%;
+  left: 15%;
+}
+
+.hp-particles::after {
+  top: 70%;
+  left: 85%;
+  animation-delay: -5s;
+}
+
+@keyframes hpParticleFloat {
+  0% { transform: translate(0, 0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(80px, -150px); opacity: 0; }
+}
+
+/* ============ 页面内容容器 ============ */
+.hp-pages {
+  position: absolute;
+  top: 8%;
+  bottom: 100px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0 16px;
+  z-index: 10;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.hp-pages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hp-pages::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+}
+
+.hp-pages::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.4);
+  border-radius: 3px;
+}
+
+.hp-pages::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.6);
+}
+
+.hp-page {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 820px;
+  padding: 20px 0 40px;
+  animation: hpPageIn 0.4s ease;
+}
+
+.hp-page.active { display: flex; }
+
+@keyframes hpPageIn {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes hpDevFloat {
+  0%, 100% { transform: translateY(0); opacity: 0.6; }
+  50% { transform: translateY(-8px); opacity: 1; }
+}
+
+/* ============ 立绘 ============ */
+.hp-portrait-frame {
+  position: relative;
+  width: min(75vw, 320px);
+  aspect-ratio: 3 / 4;
+}
+
+.hp-portrait-frame::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border: 2px solid rgba(212, 175, 55, 0.3);
+  border-radius: 16px;
+  animation: hpBorderPulse 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.hp-portrait-frame::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(135deg, #d4af37 0%, transparent 30%, transparent 70%, #d4af37 100%);
+  border-radius: 16px;
+  opacity: 0.4;
+  z-index: -1;
+  filter: blur(20px);
+  animation: hpGlowPulse 4s ease-in-out infinite;
+}
+
+@keyframes hpBorderPulse {
+  0%, 100% { border-color: rgba(212, 175, 55, 0.3); transform: rotate(0deg); }
+  50% { border-color: rgba(212, 175, 55, 0.6); transform: rotate(0deg); }
+}
+
+@keyframes hpGlowPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+.hp-portrait-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, rgba(20, 20, 40, 0.8) 0%, rgba(10, 10, 20, 0.9) 100%);
+  border: 2px solid rgba(212, 175, 55, 0.5);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(212, 175, 55, 0.1);
+}
+
+.hp-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.2s ease, transform 0.5s ease;
+  opacity: 0.9;
+}
+
+.hp-portrait-img:hover {
+  opacity: 1;
+  transform: scale(1.02);
+}
+
+/* ============ 页面标题 ============ */
+.hp-page-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  color: #d4af37;
+  text-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
+  margin-top: 8px;
+}
+
+/* ============ 切换立绘按钮 ============ */
+.hp-portrait-switch {
+  padding: 10px 24px;
+  background: rgba(18, 18, 31, 0.7);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  color: #d4af37;
+  font-size: 14px;
+  letter-spacing: 2px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.hp-portrait-switch:hover {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: #d4af37;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+}
+
+/* ============ 开始游戏按钮 ============ */
+.hp-start-btn {
+  padding: 16px 48px;
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.35) 0%, rgba(212, 175, 55, 0.1) 100%);
+  border: 2px solid #d4af37;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+  transition: all 0.2s;
+  font-family: inherit;
+  position: relative;
+  overflow: hidden;
+}
+
+.hp-start-btn:hover {
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.5) 0%, rgba(212, 175, 55, 0.15) 100%);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 30px rgba(212, 175, 55, 0.5);
+}
+
+.hp-start-btn:active {
+  transform: translateY(-1px);
+}
+
+/* 导航按钮高亮样式覆盖 —— 由 inline style 控制 */
+/* 游戏默认隐藏状态 */
+#game-root { position: fixed; inset: 0; }
+
+/* ============ 主角页（角色选择） ============ */
+.hp-hero-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #d4af37;
+  letter-spacing: 4px;
+  text-shadow: 0 0 15px rgba(212, 175, 55, 0.35);
+  margin-top: 8px;
+}
+
+.hp-hero-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 2px;
+  margin-bottom: 14px;
+}
+
+.hp-hero-cards {
+  display: flex;
+  gap: 12px;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px 4px 16px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hp-hero-cards::-webkit-scrollbar {
+  height: 6px;
+}
+
+.hp-hero-cards::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+}
+
+.hp-hero-cards::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.4);
+  border-radius: 3px;
+}
+
+.hp-hero-cards::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.6);
+}
+
+.hp-hero-card {
+  flex: 0 0 200px;
+  scroll-snap-align: center;
+  padding: 14px 10px;
+  background: rgba(18, 18, 31, 0.75);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-align: center;
+  color: inherit;
+  position: relative;
+}
+
+.hp-hero-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(212, 175, 55, 0.5);
+  box-shadow: 0 6px 25px rgba(212, 175, 55, 0.15);
+}
+
+.hp-hero-card.active {
+  border-color: #d4af37;
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.18) 0%, rgba(212, 175, 55, 0.04) 100%);
+  box-shadow: 0 0 25px rgba(212, 175, 55, 0.35), inset 0 0 20px rgba(212, 175, 55, 0.15);
+}
+
+.hp-hero-card-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  margin: 0 auto 8px;
+  border: 2px solid rgba(212, 175, 55, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: bold;
+  background: radial-gradient(circle, rgba(52, 152, 219, 0.25) 0%, rgba(26, 26, 46, 0.8) 100%);
+  color: #d4af37;
+  letter-spacing: 1px;
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.4);
+}
+
+.hp-hero-card.active .hp-hero-card-avatar {
+  border-color: #d4af37;
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 15px rgba(0, 0, 0, 0.4);
+}
+
+.hp-hero-card-name {
+  font-size: 15px;
+  font-weight: bold;
+  color: #f1c40f;
+  margin-bottom: 4px;
+  letter-spacing: 1px;
+}
+
+.hp-hero-card-skill {
+  font-size: 11px;
+  color: #8a5cf0;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.hp-hero-card-stats {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.6;
+  letter-spacing: 0.5px;
+}
+
+.hp-hero-detail {
+  width: 100%;
+  max-width: 720px;
+  margin-top: 8px;
+  background: rgba(18, 18, 31, 0.8);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 14px;
+  padding: 16px 20px;
+  color: inherit;
+  box-shadow: 0 0 30px rgba(212, 175, 55, 0.08);
+}
+
+.hp-hero-detail-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.hp-hero-detail-portrait {
+  width: 110px;
+  height: 110px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(138, 92, 240, 0.3) 0%, rgba(52, 152, 219, 0.2) 100%);
+  border: 2px solid rgba(212, 175, 55, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  font-weight: bold;
+  color: #d4af37;
+  letter-spacing: 2px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.hp-hero-detail-info {
+  flex: 1;
+  min-width: 200px;
+}
+
+.hp-hero-detail-name {
+  font-size: 22px;
+  font-weight: bold;
+  color: #f1c40f;
+  margin-bottom: 4px;
+  letter-spacing: 2px;
+}
+
+.hp-hero-detail-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.hp-hero-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px 10px;
+}
+
+.hp-hero-stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  padding: 3px 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 5px;
+}
+
+.hp-hero-stat-label {
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.5px;
+}
+
+.hp-hero-stat-value {
+  color: #f1c40f;
+  font-weight: bold;
+}
+
+.hp-hero-skill-card {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(138, 92, 240, 0.18) 0%, rgba(52, 152, 219, 0.08) 100%);
+  border: 1px solid rgba(138, 92, 240, 0.35);
+  border-radius: 10px;
+}
+
+.hp-hero-skill-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #bb88ff;
+  margin-bottom: 2px;
+  letter-spacing: 1px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hp-hero-skill-cd {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: normal;
+}
+
+.hp-hero-skill-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.7;
+}
+
+.hp-hero-passive-card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(231, 76, 60, 0.08);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 10px;
+}
+
+.hp-hero-passive-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: #ff7777;
+  margin-bottom: 4px;
+  letter-spacing: 1px;
+}
+
+.hp-hero-passive-desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.6;
+}
+
+.hp-hero-confirm {
+  margin-top: 14px;
+  padding: 12px 40px;
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.35) 0%, rgba(212, 175, 55, 0.08) 100%);
+  border: 2px solid #d4af37;
+  color: #fff;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.25);
+}
+
+.hp-hero-confirm:hover {
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.5) 0%, rgba(212, 175, 55, 0.12) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(212, 175, 55, 0.4);
+}
+
+/* ============ 适配小屏 ============ */
+@media (max-width: 600px) {
+  .hp-hero-title { font-size: 22px; }
+  .hp-hero-subtitle { font-size: 11px; }
+  .hp-hero-card { flex: 0 0 160px; min-width: 140px; padding: 10px 6px; }
+  .hp-hero-card-avatar { width: 56px; height: 56px; font-size: 22px; }
+  .hp-hero-card-name { font-size: 13px; }
+  .hp-hero-card-skill { font-size: 10px; }
+  .hp-hero-card-stats { font-size: 10px; }
+  .hp-hero-detail { padding: 12px; max-width: 100%; }
+  .hp-hero-detail-portrait { width: 80px; height: 80px; font-size: 30px; }
+  .hp-hero-detail-name { font-size: 18px; }
+  .hp-hero-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .hp-hero-confirm { padding: 10px 28px; font-size: 14px; }
+}
+
+/* ============ 适配小屏 ============ */
+@media (max-width: 480px) {
+  .hp-portrait-frame { width: min(85vw, 260px); }
+  .hp-start-btn { padding: 14px 32px; font-size: 18px; letter-spacing: 4px; }
+  .hp-page-title { font-size: 22px; letter-spacing: 6px; }
+}
+
+/* ============ 地图选择界面（主页 "开始游戏" 按钮触发） ============ */
+#mapSelectionModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #fff;
+  user-select: none;
+}
+
+#mapSelectionModal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(212, 175, 55, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+#mapSelectionSub {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 28px;
+  position: relative;
+  z-index: 2;
+}
+
+#mapSelectionGrid {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 900px;
+  max-height: 60vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+  position: relative;
+  z-index: 2;
+  /* Firefox 滚动条 */
+  scrollbar-width: thin;
+  scrollbar-color: #d4af37 #161b22;
+}
+
+/* WebKit (Chrome/Safari/Edge) 滚动条样式 */
+#mapSelectionGrid::-webkit-scrollbar {
+  width: 10px;
+  background: transparent;
+}
+
+#mapSelectionGrid::-webkit-scrollbar-track {
+  background: rgba(22, 27, 34, 0.6);
+  border-radius: 10px;
+  margin: 4px 0;
+}
+
+#mapSelectionGrid::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #d4af37 0%, #8b6914 100%);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.2s ease;
+}
+
+#mapSelectionGrid::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #e6c850 0%, #a77d1a 100%);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* 模态框内地图卡片（替代内联样式，确保可点击） */
+.map-card {
+  width: 280px;
+  padding: 12px;
+  border: 2px solid #30363d;
+  border-radius: 12px;
+  background: rgba(26, 26, 46, 0.9);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+
+.map-card:hover {
+  transform: translateY(-3px);
+  border-color: #d4af37;
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+}
+
+.map-card canvas {
+  border-radius: 6px;
+  margin-bottom: 10px;
+  background: #0a0c10;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.map-card-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #e6edf3;
+  margin-bottom: 2px;
+  pointer-events: none;
+}
+
+.map-card-desc {
+  font-size: 11px;
+  color: #777;
+  pointer-events: none;
+}
+
+.map-close-btn {
+  padding: 12px 28px;
+  border: 2px solid #555;
+  border-radius: 8px;
+  background: rgba(26, 26, 46, 0.85);
+  cursor: pointer;
+  font-size: 14px;
+  color: #aaa;
+  transition: all 0.15s ease;
+  margin-top: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.map-close-btn:hover {
+  border-color: #888;
+  color: #fff;
+}
+
+/* 模态框标题 */
+.map-modal-title {
+  font-size: 28px;
+  font-weight: bold;
+  color: #d4af37;
+  margin-bottom: 8px;
+  text-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
+  position: relative;
+  z-index: 2;
+  animation: mapModalFadeIn 0.3s ease;
+}
+
+@keyframes mapModalFadeIn {
+  0% { opacity: 0; transform: translateY(-10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* 地图选择界面在移动端适配 */
+@media (max-width: 480px) {
+  #mapSelectionGrid { max-width: 100%; padding: 10px; }
+  .map-card { width: 100%; max-width: 320px; }
+  .map-modal-title { font-size: 22px; }
+}

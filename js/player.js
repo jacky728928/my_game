@@ -4,68 +4,133 @@ class Player {
     this.x = WORLD_W / 2;
     this.y = WORLD_H / 2;
     this.radius = PLAYER_RADIUS;
-    this.hp = PLAYER_MAX_HP;
+    // 角色绑定（从 hero 页读取，默认 echo01）
+    this.heroId = null;
+    this.hero = null;
+    this.hp = 0;
     this.maxHp = PLAYER_MAX_HP;
+    this.baseAttackInterval = PISTOL_INTERVAL;
     this.speed = PLAYER_SPEED;
     this.vx = 0;
     this.vy = 0;
     // 武器
     this.attackCooldown = 0;
-    this.attackRange = PISTOL_RANGE;
+    // 三连发状态
+    this.burstActive = false;
+    this.burstShotsLeft = 0;
+    this.burstShotTimer = 0;
+    this.burstTotalShots = 1;
+    this.burstShotInterval = 0.12;
+    this.burstDamageMult = 1.0;
+    this.bulletSpeed = BULLET_SPEED;
+    this.bulletColor = '#f1c40f';
+    this.bulletCore = '#ffffff';
     this.attackDamage = PISTOL_DAMAGE;
-    this.baseAttackInterval = PISTOL_INTERVAL;
+    this.attackRange = PISTOL_RANGE;
     // 能力加成
     this.attackSpeedBonus = 0;
     this.critChance = 0;
     this.critMultiplier = CRIT_MULTIPLIER_BASE;
-    this.attackInterval = this.baseAttackInterval * (100 / (100 + this.attackSpeedBonus));
-    // 新增能力
-    this.damageBonus = 0;           // 固定加值，基础攻击 +N
-    this.viewRangeBonus = 0;         // 百分比，如 5 = +5%
-    this.attackRangeBonus = 0;       // px，如 5 = 攻击范围 +5px
-    this.pickupRangeBonus = 0;       // px，如 5 = 经验吸取范围 +5px
-    this.expMultiplier = 1;           // 经验获取倍率（开发者面板可调）
-    // 副武器槽：最多 MAX_SECONDARY_WEAPONS 个
-    this.secondaryWeapons = [];       // [{ id, cooldown, ...静态参数引用 }]
-    // 副武器专属技能等级
-    this.secondaryAbilityLevels = {}; // { weaponId: { abilityId: level } }
-    // 主动技能
-    this.activeSkillId = null;         // 已装备的主动技能 id
-    this.activeSkillCooldown = 0;      // 冷却剩余（秒）
-    this.activeSkillBuff = null;       // 当前 buff：{ id, timeLeft, speedMult }
-    // 朝向（弧度）
+    this.damageBonus = 0;
+    this.viewRangeBonus = 0;
+    this.attackRangeBonus = 0;
+    this.pickupRangeBonus = 0;
+    this.expMultiplier = 1;
+    // 被动（默认初始化后由 _bindHero() 覆盖 enabled
+    this.tacticalCharge = {
+      enabled: false,
+      roundsCompleted: 0,
+      stacks: 0,
+      maxStacks: 3,
+      roundsPerStack: 1,
+      damageBonusMult: 0.8,
+      stunTime: 0.3,
+      pendingBuff: false,
+    };
+    this.fieldReflex = {
+      enabled: false,
+      hpThreshold: 0.3,
+      speedBonus: 20,
+      attackSpeedBonus: 15,
+      active: false,
+    };
+    this.secondaryWeapons = [];
+    this.secondaryAbilityLevels = {};
+    this.activeSkillId = null;
+    this.activeSkillCooldown = 0;
+    this.activeSkillBuff = null;
     this.angle = 0;
-    // 受击闪光
     this.damageFlash = 0;
-    // 等级经验
     this.level = 1;
     this.xp = 0;
     this.xpToNext = XP_LEVEL_BASE;
     this.alive = true;
-    // 升级挂起（数组，每项记录升级后得到的等级和类型）
     this.pendingLevelUps = [];
+    this._stunFlash = 0;
+    // 角色绑定（必须在所有字段初始化后调用，因为它覆盖部分字段并读写被动.enabled
+    this._bindHero();
+    this.hp = this.maxHp;
+    this.attackInterval = this.baseAttackInterval * (100 / (100 + this.attackSpeedBonus));
   }
 
-  // 动态属性
-  get effectiveAttackRange() { return PISTOL_RANGE + this.attackRangeBonus; }
+  _bindHero() {
+    let heroId = 'echo01';
+    try {
+      const saved = localStorage.getItem('hero_selected_id');
+      if (saved && typeof HERO_POOL !== 'undefined' && HERO_POOL[saved]) heroId = saved;
+    } catch (e) {}
+    if (typeof HERO_POOL === 'undefined' || !HERO_POOL[heroId]) heroId = 'echo01';
+    this.heroId = heroId;
+    const hero = HERO_POOL[heroId];
+    this.hero = hero;
+    this.maxHp = hero.stats.maxHp;
+    this.baseAttackInterval = hero.primary.burstInterval;
+    this.attackRange = hero.primary.range;
+    this.attackDamage = PISTOL_DAMAGE + hero.stats.attackBonus;
+    this.burstTotalShots = (hero.primary.type === 'triple') ? 3 : 1;
+    this.burstShotInterval = hero.primary.shotInterval || 0.12;
+    this.burstDamageMult = hero.primary.damageMult || 1.0;
+    this.bulletSpeed = hero.primary.bulletSpeed || BULLET_SPEED;
+    this.bulletColor = hero.primary.bulletColor || '#f1c40f';
+    this.bulletCore = hero.primary.bulletCore || '#ffffff';
+    this.activeSkillId = hero.activeSkill || null;
+    const passives = hero.passives || [];
+    if (this.tacticalCharge) this.tacticalCharge.enabled = passives.indexOf('tactical_charge') !== -1;
+    if (this.fieldReflex) this.fieldReflex.enabled = passives.indexOf('field_reflex') !== -1;
+    if (window.LOG) {
+      window.LOG('player: 绑定角色 = ' + heroId + ' (' + hero.name + ')，主武器=' + hero.primary.name + '，连发=' + this.burstTotalShots + '发，主动技能=' + (this.activeSkillId || '无') + '，被动=[' + passives.join(', ') + ']');
+    }
+  }
+
+  get effectiveAttackRange() { return (this.hero ? this.hero.stats.attackRange : PISTOL_RANGE) + this.attackRangeBonus; }
   get effectivePickupRange() { return XP_PICKUP_RANGE + this.pickupRangeBonus; }
-  // 视野 +5% → 世界内容缩小为 1/1.05，屏幕内能显示更多区域
   get viewRangeMultiplier() { return 1 / (1 + this.viewRangeBonus / 100); }
-  get effectiveDamage() { return PISTOL_DAMAGE + this.damageBonus; }
+  get effectiveDamage() { return PISTOL_DAMAGE + this.damageBonus + (this.hero ? this.hero.stats.attackBonus : 0); }
 
   update(dt, bullets) {
     if (!this.alive) return;
-    // 计算实际速度（带疾跑加成）
     let curSpeed = this.speed;
     if (this.activeSkillBuff && this.activeSkillBuff.id === 'haste' && this.activeSkillBuff.timeLeft > 0) {
       curSpeed = this.speed * this.activeSkillBuff.speedMult;
+    }
+    // 战场反应：HP < 30% 时额外加速
+    if (this.fieldReflex.enabled) {
+      const ratio = this.hp / this.maxHp;
+      if (ratio < this.fieldReflex.hpThreshold) {
+        curSpeed *= (1 + this.fieldReflex.speedBonus / 100);
+        if (!this.fieldReflex.active) {
+          this.fieldReflex.active = true;
+          this._refreshAttackInterval();
+        }
+      } else if (this.fieldReflex.active) {
+        this.fieldReflex.active = false;
+        this._refreshAttackInterval();
+      }
     }
     const oldX = this.x;
     const oldY = this.y;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    // 限制 vx/vy 用 curSpeed 的倍率 — 重新设置为当前输入方向 × 实际速度
-    // （外层 setVelocity 使用 this.speed 作为基准，这里二次调整）
     if (Math.abs(this.vx) > 1 || Math.abs(this.vy) > 1) {
       const vMag = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
       if (vMag > 0) {
@@ -73,7 +138,6 @@ class Player {
         this.vy = this.vy / vMag * curSpeed;
       }
     }
-    // 墙体碰撞修正
     const resolved = resolveCircleWalls(oldX, oldY, this.radius, this.x, this.y);
     this.x = resolved.x;
     this.y = resolved.y;
@@ -83,6 +147,14 @@ class Player {
       this.angle = Math.atan2(this.vy, this.vx);
     }
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+    // 三连发：每 burstShotInterval 发射一发
+    if (this.burstActive) {
+      this.burstShotTimer -= dt;
+      if (this.burstShotTimer <= 0 && this.burstShotsLeft > 0) {
+        // 发射下一发（由 combat.js 监听 burstActive+shotTimer 触发；这里只维护状态）
+        // 实际由 combat.update() 调用 fireBurstShot()
+      }
+    }
     this.activeSkillCooldown = Math.max(0, this.activeSkillCooldown - dt);
     if (this.activeSkillBuff) {
       this.activeSkillBuff.timeLeft -= dt;
@@ -93,8 +165,17 @@ class Player {
       if (this._invulnTimeLeft <= 0) this._invulnTimeLeft = 0;
     }
     this.damageFlash = Math.max(0, this.damageFlash - dt);
+    this._stunFlash = Math.max(0, this._stunFlash - dt);
     this.vx = 0;
     this.vy = 0;
+  }
+
+  _refreshAttackInterval() {
+    let bonus = this.attackSpeedBonus;
+    if (this.fieldReflex.enabled && this.fieldReflex.active) {
+      bonus += this.fieldReflex.attackSpeedBonus;
+    }
+    this.attackInterval = this.baseAttackInterval * (100 / (100 + bonus));
   }
 
   setVelocity(vx, vy) {
@@ -110,6 +191,51 @@ class Player {
     this.attackCooldown = this.attackInterval;
   }
 
+  // 开启三连发（由 combat.js 调用）
+  startBurst() {
+    if (this.burstTotalShots > 1) {
+      this.burstActive = true;
+      this.burstShotsLeft = this.burstTotalShots;
+      this.burstShotTimer = 0; // 立即发第一发
+    } else {
+      this.burstActive = false;
+      this.burstShotsLeft = 0;
+    }
+  }
+
+  // 三连发中发射了一发，返回是否"当前这发"需要应用战术充能加成
+  consumeBurstShot() {
+    if (!this.burstActive || this.burstShotsLeft <= 0) return { isFirst: false, chargeStacks: 0 };
+    const totalShots = this.burstTotalShots;
+    const isFirst = (this.burstShotsLeft === totalShots);
+    let chargeStacks = 0;
+    if (this.tacticalCharge.enabled && isFirst && this.tacticalCharge.pendingBuff) {
+      chargeStacks = this.tacticalCharge.stacks;
+      // 消耗一层
+      this.tacticalCharge.stacks = Math.max(0, this.tacticalCharge.stacks - 1);
+      if (this.tacticalCharge.stacks <= 0) {
+        this.tacticalCharge.pendingBuff = false;
+      }
+    }
+    this.burstShotsLeft -= 1;
+    if (this.burstShotsLeft <= 0) {
+      this.burstActive = false;
+      // 完成一轮三连发 → 计数充能
+      if (this.tacticalCharge.enabled && totalShots > 1) {
+        this.tacticalCharge.roundsCompleted += 1;
+        if (this.tacticalCharge.roundsCompleted >= this.tacticalCharge.roundsPerStack) {
+          this.tacticalCharge.roundsCompleted = 0;
+          if (this.tacticalCharge.stacks < this.tacticalCharge.maxStacks) {
+            this.tacticalCharge.stacks += 1;
+            this.tacticalCharge.pendingBuff = true;
+            if (window.LOG) window.LOG('player: [战术充能] 获得一层充能！当前层数=' + this.tacticalCharge.stacks + '/' + this.tacticalCharge.maxStacks);
+          }
+        }
+      }
+    }
+    return { isFirst: isFirst, chargeStacks: chargeStacks };
+  }
+
   addXp(amount) {
     this.xp += amount * (this.expMultiplier || 1);
     let leveled = false;
@@ -119,14 +245,8 @@ class Player {
       this.maxHp += 5;
       this.hp = Math.min(this.hp + 5, this.maxHp);
       this.xpToNext = this.level * XP_LEVEL_BASE;
-      // 判断本等级的类型
-      const isSecondary =
-        this.level === 5 ||
-        (this.level >= 10 && this.level % 10 === 0);
-      this.pendingLevelUps.push({
-        level: this.level,
-        type: isSecondary ? 'secondary' : 'ability',
-      });
+      const isSecondary = this.level === 5 || (this.level >= 10 && this.level % 10 === 0);
+      this.pendingLevelUps.push({ level: this.level, type: isSecondary ? 'secondary' : 'ability' });
       leveled = true;
     }
     return leveled;
@@ -149,7 +269,7 @@ class Player {
         break;
       case 'attack_speed':
         this.attackSpeedBonus += 20;
-        this.attackInterval = this.baseAttackInterval * (100 / (100 + this.attackSpeedBonus));
+        this._refreshAttackInterval();
         break;
       case 'crit_chance':
         this.critChance += 10;
@@ -167,28 +287,30 @@ class Player {
         this.pickupRangeBonus += 25;
         break;
       default:
-        // 副武器专属技能：按完整 abilityId 累加等级（flat map，避免下划线拆分问题）
-        this.secondaryAbilityLevels[abilityId] =
-          (this.secondaryAbilityLevels[abilityId] || 0) + 1;
+        this.secondaryAbilityLevels[abilityId] = (this.secondaryAbilityLevels[abilityId] || 0) + 1;
         break;
     }
   }
 
-  rollAttack() {
+  // 计算单次射击的最终伤害（基于 roll 且含战术充能）
+  rollAttack(chargeStacks) {
     const roll = Math.random() * 100;
-    const finalDmg = this.effectiveDamage;
-    if (roll < this.critChance) {
-      return { damage: finalDmg * this.critMultiplier, isCrit: true };
+    const baseDmg = this.effectiveDamage;
+    let dmg = baseDmg;
+    if (chargeStacks && chargeStacks > 0) {
+      dmg = baseDmg * (1 + this.tacticalCharge.damageBonusMult);
+      if (window.LOG) window.LOG('player: [战术充能·首发] 伤害 ' + dmg.toFixed(2) + '（基础 ' + baseDmg.toFixed(2) + '）');
     }
-    return { damage: finalDmg, isCrit: false };
+    if (roll < this.critChance) {
+      return { damage: dmg * this.critMultiplier, isCrit: true, hasCharge: chargeStacks > 0 };
+    }
+    return { damage: dmg, isCrit: false, hasCharge: chargeStacks > 0 };
   }
 
-  // 副武器：是否已装备同名
   hasSecondaryWeapon(id) {
     return this.secondaryWeapons.some(w => w.id === id);
   }
 
-  // 副武器：装备（调用方确保数量合法）
   equipSecondaryWeapon(id) {
     if (!SECONDARY_WEAPON_POOL[id]) return;
     if (this.hasSecondaryWeapon(id)) return;
@@ -196,16 +318,14 @@ class Player {
     this.secondaryWeapons.push({
       id: def.id,
       def: def,
-      cooldown: 0,              // 装备后立即可触发
+      cooldown: 0,
     });
   }
 
-  // 副武器：丢弃
   discardSecondaryWeapon(id) {
     this.secondaryWeapons = this.secondaryWeapons.filter(w => w.id !== id);
   }
 
-  // 主动技能：装备
   equipActiveSkill(id) {
     if (!ACTIVE_SKILL_POOL[id]) return;
     this.activeSkillId = id;
@@ -213,7 +333,6 @@ class Player {
     this.activeSkillBuff = null;
   }
 
-  // 主动技能：释放（返回是否成功释放，调用方处理具体效果）
   releaseActiveSkill() {
     if (!this.activeSkillId) return false;
     if (this.activeSkillCooldown > 0) return false;
@@ -223,14 +342,16 @@ class Player {
     return true;
   }
 
-  // 是否处于免伤/霸体状态
   isInvulnerable() {
     if (this._invulnTimeLeft && this._invulnTimeLeft > 0) return true;
     return false;
   }
 
-  // 开启霸体（冲刺翻滚用）
   startInvuln(seconds) {
     this._invulnTimeLeft = seconds;
+  }
+
+  flashStun(time) {
+    this._stunFlash = time || 0.2;
   }
 }

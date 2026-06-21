@@ -1,0 +1,14 @@
+- [ ] Checkpoint 1: `pic/` 目录存在且包含至少 7 张立绘图片
+- [ ] Checkpoint 2: `css/homepage.css` 存在，主页视觉样式（金色主题/底部导航/立绘框）与 test_project 一致
+- [ ] Checkpoint 3: `js/homepage.js` 存在，包含 `Homepage.init/show/hide/onStartGameClick` 等方法
+- [ ] Checkpoint 4: `#homepage-root` 容器在 `index.html` 中存在且默认显示
+- [ ] Checkpoint 5: `#game-root` 容器在 `index.html` 中存在且默认隐藏
+- [ ] Checkpoint 6: 冒险页面有可见的「开始游戏」按钮（`.start-btn`）
+- [ ] Checkpoint 7: `GameCore.init(mapData, spawn)` 和 `GameCore.stop()` 暴露在 window 上
+- [ ] Checkpoint 8: `GameUI.openMapSelection(callback)` 暴露在 window 上且可复用
+- [ ] Checkpoint 9: 暂停菜单和阵亡画面中各有「返回主页」按钮
+- [ ] Checkpoint 10: 手动测试流程：主页 → 开始游戏 → 选地图 → 启动游戏 → 正常操作 → 返回主页 → 再开始游戏，全流程无误
+- [ ] Checkpoint 11: 主页停留 10 秒，游戏 rAF 循环不应运行（无 player 绘制、无帧率抖动）
+- [ ] Checkpoint 12: 游戏内原有按钮/UI 不因新 CSS 被破坏（经验条、副武器槽、开发者面板、暂停菜单）
+- [ ] Checkpoint 13: 地图选择界面显示所有 `地图/*.json` 且预览正确
+- [ ] Checkpoint 14: 移动端（<600px）和桌面端（>=768px）布局均正常

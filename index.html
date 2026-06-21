@@ -2,141 +2,109 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
-<title>生存射击</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>冒险射击</title>
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/homepage.css">
 </head>
-<body data-page="adventure">
+<body>
 
-<!-- 背景层（仅在非冒险页显示粒子动态背景） -->
-<div class="bg-layer">
-  <div class="bg-grid"></div>
-  <div class="bg-glow bg-glow-1"></div>
-  <div class="bg-glow bg-glow-2"></div>
-  <div class="bg-particles" id="particles"></div>
-</div>
-
-<!-- 游戏画布层（与页面容器同级，只有冒险页才会显示） -->
-<canvas id="gameCanvas"></canvas>
-<canvas id="minimap"></canvas>
-<div id="wheel">
-  <div id="wheelKnob"></div>
-</div>
-<button id="pauseBtn" title="暂停">II</button>
-
-<!-- 主容器 -->
-<div id="app">
-  <div id="page-container">
-
-    <!-- 冒险页（空；游戏元素是页面容器的兄弟节点，由 CSS 控制显隐） -->
-    <div id="page-adventure" class="page active">
-      <div class="page-title" style="position:absolute;top:30px;left:50%;transform:translateX(-50%);margin-top:0;opacity:1">冒险</div>
-    </div>
-
-    <!-- 主角页（立绘展示 + 切换） -->
-    <div id="page-hero" class="page">
-      <div class="portrait-frame">
-        <div class="portrait-glow"></div>
-        <div class="portrait-inner">
-          <img class="portrait-img" src="" alt="立绘">
-        </div>
-        <div class="portrait-corner tl"></div>
-        <div class="portrait-corner tr"></div>
-        <div class="portrait-corner bl"></div>
-        <div class="portrait-corner br"></div>
-      </div>
-      <div class="page-title">主角</div>
-      <button class="portrait-switch" id="portraitSwitch">↻ 切换立绘</button>
-    </div>
-
-    <!-- 科技树页（开发中） -->
-    <div id="page-tech" class="page">
-      <div class="dev-frame">
-        <div class="dev-inner">
-          <div class="dev-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M12 2L8 6h3v6H8l4 4 4-4h-3V6h3L12 2z"></path>
-              <path d="M5 16l-2 4h4l-2 4z"></path>
-              <path d="M19 16l2 4h-4l2 4z"></path>
-            </svg>
-          </div>
-          <div class="dev-text">开发中</div>
-          <div class="dev-sub">敬请期待</div>
-        </div>
-      </div>
-      <div class="page-title">科技树</div>
-    </div>
-
-    <!-- 商店页（开发中） -->
-    <div id="page-shop" class="page">
-      <div class="dev-frame">
-        <div class="dev-inner">
-          <div class="dev-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M3 9h18v10a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-              <path d="M3 9l2-6h14l2 6"></path>
-              <path d="M12 14v4"></path>
-            </svg>
-          </div>
-          <div class="dev-text">开发中</div>
-          <div class="dev-sub">敬请期待</div>
-        </div>
-      </div>
-      <div class="page-title">商店</div>
-    </div>
-
+<!-- ============ 主页容器（默认显示） ============ -->
+<div id="homepage-root">
+  <!-- 背景层 -->
+  <div class="hp-bg-layer">
+    <div class="hp-bg-grid"></div>
+    <div class="hp-bg-glow" style="width:400px;height:400px;background:radial-gradient(circle,#d4af37 0%,transparent 70%);top:-100px;right:-100px;"></div>
+    <div class="hp-bg-glow" style="width:300px;height:300px;background:radial-gradient(circle,#00d4ff 0%,transparent 70%);bottom:-50px;left:-50px;animation-delay:-4s;"></div>
+    <div class="hp-particles"></div>
   </div>
 
-  <!-- 底部导航栏（始终可见） -->
-  <nav id="bottom-nav">
-    <button class="nav-btn" data-page="hero">
-      <div class="nav-icon-wrap">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="8" r="4"></circle>
-          <path d="M4 20c0-4 4-6 8-6s8 2 8 6"></path>
-        </svg>
+  <!-- ============ 页面：冒险（默认显示） ============ -->
+  <div class="hp-pages">
+    <div class="hp-page active" data-page="adventure">
+      <div class="hp-portrait-frame">
+        <div class="hp-portrait-inner">
+          <img class="hp-portrait-img" src="pic/初始角色.png" alt="立绘">
+          <div class="hp-portrait-placeholder" style="display:none;position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);gap:12px;">
+            <div style="font-size:48px;letter-spacing:4px;">?</div>
+            <div style="font-size:12px;letter-spacing:2px;">暂无立绘</div>
+          </div>
+        </div>
       </div>
-      <span class="nav-label">主角</span>
-      <div class="nav-indicator"></div>
+      <div style="display:flex;flex-direction:column;gap:12px;align-items:center;margin-top:8px;">
+        <button class="hp-portrait-switch" onclick="Homepage._switchPortrait && Homepage._switchPortrait()">↻ 切换立绘</button>
+        <button class="hp-start-btn" onclick="Homepage._startGame && Homepage._startGame()">开始游戏</button>
+      </div>
+      <div class="hp-page-title">冒险</div>
+    </div>
+
+    <!-- ============ 页面：主角（角色选择） ============ -->
+    <div class="hp-page" data-page="hero">
+      <div class="hp-hero-title">选择你的干员</div>
+      <div class="hp-hero-subtitle">每位干员拥有独特属性与专属主动技能</div>
+
+      <div id="hpHeroCards" class="hp-hero-cards"></div>
+
+      <div id="hpHeroDetail" class="hp-hero-detail">
+        <!-- 由 homepage.js 动态渲染 -->
+      </div>
+
+      <button id="hpHeroConfirmBtn" class="hp-hero-confirm">确认选择 / 返回冒险</button>
+      <div class="hp-page-title">主角</div>
+    </div>
+
+    <!-- ============ 页面：科技树（占位） ============ -->
+    <div class="hp-page" data-page="tech">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:16px;animation:hpDevFloat 3s ease-in-out infinite;">
+        <div style="font-size:36px;color:rgba(255,255,255,0.6);letter-spacing:8px;">开发中</div>
+        <div style="font-size:14px;color:rgba(255,255,255,0.35);letter-spacing:4px;">敬请期待</div>
+      </div>
+      <div class="hp-page-title">科技树</div>
+    </div>
+
+    <!-- ============ 页面：商店（占位） ============ -->
+    <div class="hp-page" data-page="shop">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:16px;animation:hpDevFloat 3s ease-in-out infinite;">
+        <div style="font-size:36px;color:rgba(255,255,255,0.6);letter-spacing:8px;">开发中</div>
+        <div style="font-size:14px;color:rgba(255,255,255,0.35);letter-spacing:4px;">敬请期待</div>
+      </div>
+      <div class="hp-page-title">商店</div>
+    </div>
+  </div>
+
+  <!-- ============ 底部导航 ============ -->
+  <nav class="hp-bottom-nav" style="display:flex;position:fixed;bottom:0;left:0;right:0;height:100px;background:linear-gradient(180deg,transparent 0%,#0a0a14 50%);padding:15px 16px 20px;align-items:flex-end;justify-content:center;gap:8px;z-index:100;">
+    <button class="hp-nav-btn" data-page="hero" style="flex:1;max-width:140px;height:70px;background:rgba(18,18,31,0.85);border:1px solid rgba(255,255,255,0.1);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;transition:all 0.3s;color:inherit;font-family:inherit;">
+      <span style="font-size:24px;color:rgba(255,255,255,0.6);">◉</span>
+      <span style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;">主角</span>
     </button>
-    <button class="nav-btn" data-page="tech">
-      <div class="nav-icon-wrap">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L8 6h3v6H8l4 4 4-4h-3V6h3L12 2z"></path>
-          <path d="M5 16l-2 4h4l-2 4z"></path>
-          <path d="M19 16l2 4h-4l2 4z"></path>
-        </svg>
-      </div>
-      <span class="nav-label">科技树</span>
-      <div class="nav-indicator"></div>
+    <button class="hp-nav-btn" data-page="tech" style="flex:1;max-width:140px;height:70px;background:rgba(18,18,31,0.85);border:1px solid rgba(255,255,255,0.1);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;transition:all 0.3s;color:inherit;font-family:inherit;">
+      <span style="font-size:24px;color:rgba(255,255,255,0.6);">⚙</span>
+      <span style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;">科技树</span>
     </button>
-    <button class="nav-btn active" data-page="adventure">
-      <div class="nav-icon-wrap">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L9 9l-7 1 5 5-1 7 6-3 6 3-1-7 5-5-7-1-3-7z"></path>
-        </svg>
-      </div>
-      <span class="nav-label">冒险</span>
-      <div class="nav-indicator"></div>
+    <button class="hp-nav-btn active" data-page="adventure" style="flex:1;max-width:140px;height:70px;background:linear-gradient(180deg,rgba(212,175,55,0.2) 0%,rgba(212,175,55,0.05) 100%);border:2px solid #d4af37;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;transition:all 0.3s;color:inherit;font-family:inherit;box-shadow:0 0 20px rgba(212,175,55,0.3),inset 0 0 20px rgba(212,175,55,0.1);">
+      <span style="font-size:24px;color:#d4af37;filter:drop-shadow(0 0 8px rgba(212,175,55,0.5));">⚔</span>
+      <span style="font-size:12px;color:#d4af37;font-weight:700;letter-spacing:1px;">冒险</span>
     </button>
-    <button class="nav-btn" data-page="shop">
-      <div class="nav-icon-wrap">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 9h18v10a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-          <path d="M3 9l2-6h14l2 6"></path>
-          <path d="M12 14v4"></path>
-        </svg>
-      </div>
-      <span class="nav-label">商店</span>
-      <div class="nav-indicator"></div>
+    <button class="hp-nav-btn" data-page="shop" style="flex:1;max-width:140px;height:70px;background:rgba(18,18,31,0.85);border:1px solid rgba(255,255,255,0.1);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;transition:all 0.3s;color:inherit;font-family:inherit;">
+      <span style="font-size:24px;color:rgba(255,255,255,0.6);">🛒</span>
+      <span style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;">商店</span>
     </button>
   </nav>
 </div>
 
-<!-- 游戏脚本（按依赖顺序） -->
+<!-- ============ 游戏容器（默认隐藏，点击开始游戏后显示） ============ -->
+<div id="game-root" style="display:none;position:fixed;inset:0;">
+  <canvas id="gameCanvas"></canvas>
+  <canvas id="minimap"></canvas>
+  <div id="wheel" class="hidden">
+    <div id="wheelKnob"></div>
+  </div>
+</div>
+
+<!-- ============ 游戏 JS ============ -->
+<!-- logger.js 必须最先加载 —— 其他模块通过 window.LOG() 记录日志 -->
+<script src="js/logger.js"></script>
 <script src="js/constants.js"></script>
 <script src="js/walls.js"></script>
 <script src="js/player.js"></script>
@@ -149,11 +117,176 @@
 <script src="js/effects.js"></script>
 <script src="js/combat.js"></script>
 <script src="js/active_skill.js"></script>
+<script src="js/map_data.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/dev_panel.js"></script>
 <script src="js/game_core.js"></script>
 
-<!-- 主页交互（底部导航与立绘页） -->
-<script src="js/home.js"></script>
+<!-- ============ 主页 JS（最后加载，注册导航事件） ============ -->
+<script src="js/homepage.js"></script>
+
+<script>
+  // 主页初始化：底部导航点击切换页面
+  (function () {
+    const btns = document.querySelectorAll('#homepage-root .hp-nav-btn');
+    btns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        btns.forEach((b) => {
+          b.classList.remove('active');
+          // 重置为非激活样式
+          b.style.background = 'rgba(18,18,31,0.85)';
+          b.style.border = '1px solid rgba(255,255,255,0.1)';
+          b.style.boxShadow = 'none';
+          const icon = b.querySelector('span:first-child');
+          if (icon) { icon.style.color = 'rgba(255,255,255,0.6)'; icon.style.filter = 'none'; }
+          const label = b.querySelector('span:nth-child(2)');
+          if (label) { label.style.color = 'rgba(255,255,255,0.4)'; label.style.fontWeight = 'normal'; }
+        });
+        // 激活当前按钮
+        btn.classList.add('active');
+        btn.style.background = 'linear-gradient(180deg,rgba(212,175,55,0.2) 0%,rgba(212,175,55,0.05) 100%)';
+        btn.style.border = '2px solid #d4af37';
+        btn.style.boxShadow = '0 0 20px rgba(212,175,55,0.3),inset 0 0 20px rgba(212,175,55,0.1)';
+        const icon = btn.querySelector('span:first-child');
+        if (icon) { icon.style.color = '#d4af37'; icon.style.filter = 'drop-shadow(0 0 8px rgba(212,175,55,0.5))'; }
+        const label = btn.querySelector('span:nth-child(2)');
+        if (label) { label.style.color = '#d4af37'; label.style.fontWeight = '700'; }
+
+        // 切换页面内容
+        const pages = document.querySelectorAll('#homepage-root .hp-page');
+        pages.forEach((p) => {
+          p.classList.remove('active');
+        });
+        const target = document.querySelector('#homepage-root .hp-page[data-page="' + btn.dataset.page + '"]');
+        if (target) target.classList.add('active');
+      });
+    });
+
+    // 立绘：基于当前选中角色动态切换
+    let portraitIdx = 0;
+
+    window.Homepage = window.Homepage || {};
+
+    window.Homepage._switchPortrait = function () {
+      if (window.LOG) window.LOG('homepage: 切换立绘');
+      try {
+        // 读当前角色 id
+        let heroId = localStorage.getItem('hero_selected_id') || 'echo01';
+        if (typeof HERO_POOL !== 'undefined' && HERO_POOL[heroId]) {
+          const hero = HERO_POOL[heroId];
+          // portrait 可以是字符串 或 字符串数组
+          let portraits = hero.portrait;
+          if (Array.isArray(portraits) && portraits.length > 1) {
+            portraitIdx = (portraitIdx + 1) % portraits.length;
+            const img = document.querySelector('#homepage-root .hp-portrait-img');
+            const placeholder = document.querySelector('#homepage-root .hp-portrait-placeholder');
+            if (img) {
+              if (placeholder) placeholder.style.display = 'none';
+              img.style.display = 'block';
+              img.style.opacity = '0';
+              setTimeout(function () {
+                img.src = portraits[portraitIdx];
+                img.style.opacity = '1';
+              }, 150);
+            }
+          } else if (typeof portraits === 'string' && portraits) {
+            // 单图 → 不切换（只有一张立绘）
+            if (window.LOG) window.LOG('homepage: 角色 [' + heroId + '] 只有一张立绘，不切换');
+          } else {
+            // 无立绘
+            const img = document.querySelector('#homepage-root .hp-portrait-img');
+            const placeholder = document.querySelector('#homepage-root .hp-portrait-placeholder');
+            if (img) img.style.display = 'none';
+            if (placeholder) placeholder.style.display = 'flex';
+            if (window.LOG) window.LOG('homepage: 角色 [' + heroId + '] 无立绘');
+          }
+        }
+      } catch (e) {
+        if (window.LOG_ERROR) window.LOG_ERROR('homepage: 切换立绘失败: ' + e);
+      }
+    };
+
+    window.Homepage._startGame = function () {
+      if (window.LOG) window.LOG('主页: [_startGame] 用户点击开始游戏，打开地图选择');
+      if (window.GameUI && typeof window.GameUI.openMapSelection === 'function') {
+        window.GameUI.openMapSelection(function (mapData) {
+          if (window.LOG) window.LOG('主页: [callback] 收到地图选择回调，mapData=' + (mapData ? 'OK' : 'null'));
+          if (mapData) {
+            // 存储地图数据 → game_core init 会读取
+            window._pendingMapData = mapData;
+            if (window.LOG) window.LOG('主页: 收到选中地图 "' + (mapData.name || '未命名') + '" walls=' + ((mapData.walls && mapData.walls.length) || 0));
+            if (mapData.world && typeof window.setWorldSize === 'function') {
+              window.setWorldSize(mapData.world.width, mapData.world.height, '主页: 用户选中地图 "' + (mapData.name || '未命名') + '"');
+            } else if (mapData.world) {
+              if (window.LOG_ERROR) window.LOG_ERROR('主页: window.setWorldSize 不可用！');
+              // 降级：直接赋值
+              WORLD_W = mapData.world.width;
+              WORLD_H = mapData.world.height;
+              window.WORLD_W = WORLD_W;
+              window.WORLD_H = WORLD_H;
+            }
+            if (mapData.playerSpawn) {
+              window._pendingPlayerSpawn = { x: mapData.playerSpawn.x, y: mapData.playerSpawn.y };
+              if (window.LOG) window.LOG('主页: 设置玩家出生点 (' + mapData.playerSpawn.x + ', ' + mapData.playerSpawn.y + ')');
+            }
+          } else {
+            if (window.LOG) window.LOG('主页: 用户取消地图选择（点击了返回按钮）');
+          }
+          // 隐藏主页，显示游戏
+          const hp = document.getElementById('homepage-root');
+          const gr = document.getElementById('game-root');
+          if (hp) hp.style.display = 'none';
+          if (gr) gr.style.display = 'block';
+          if (window.LOG) window.LOG('主页: DOM 切换完成，homepage-root=none, game-root=block');
+          // 启动游戏
+          if (window.GameCore && typeof window.GameCore.init === 'function') {
+            try {
+              if (window.LOG) window.LOG('主页: 调用 GameCore.init()...');
+              window.GameCore.init();
+              if (window.LOG) window.LOG('主页: GameCore.init() 完成，启动游戏循环');
+              window.GameCore.startLoop();
+            } catch (err) {
+              if (window.LOG_ERROR) window.LOG_ERROR('主页: GameCore.init/startLoop 异常: ' + (err && err.message ? err.message : err));
+              console.error('[GameCore] 启动异常:', err);
+            }
+          } else {
+            if (window.LOG_ERROR) window.LOG_ERROR('主页: GameCore.init 不可用！window.GameCore=' + (window.GameCore ? '存在' : 'undefined'));
+          }
+        });
+      } else {
+        // 降级：没有地图选择，直接启动默认地图
+        if (window.LOG_WARN) window.LOG_WARN('主页: GameUI.openMapSelection 不可用，降级启动默认地图');
+        const hp = document.getElementById('homepage-root');
+        const gr = document.getElementById('game-root');
+        if (hp) hp.style.display = 'none';
+        if (gr) gr.style.display = 'block';
+        if (window.GameCore && typeof window.GameCore.init === 'function') {
+          window.GameCore.init();
+          window.GameCore.startLoop();
+        }
+      }
+    };
+
+    // 让 Homepage.show/hide 也能切换 DOM 可见性
+    window.Homepage.show = function () {
+      // 先停止游戏循环
+      if (window.GameCore && typeof window.GameCore.stopLoop === 'function') {
+        window.GameCore.stopLoop();
+      }
+      const hp = document.getElementById('homepage-root');
+      const gr = document.getElementById('game-root');
+      if (hp) hp.style.display = 'block';
+      if (gr) gr.style.display = 'none';
+    };
+
+    window.Homepage.hide = function () {
+      const hp = document.getElementById('homepage-root');
+      const gr = document.getElementById('game-root');
+      if (hp) hp.style.display = 'none';
+      if (gr) gr.style.display = 'block';
+    };
+  })();
+</script>
+
 </body>
 </html>

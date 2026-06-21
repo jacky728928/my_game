@@ -5,6 +5,8 @@ class Renderer {
     this.ctx = this.canvas.getContext('2d');
     this.resize();
     window.addEventListener('resize', () => this.resize());
+    // 立绘缓存 { path: HTMLImageElement }
+    this._portraitCache = {};
   }
 
   resize() {
@@ -118,19 +120,29 @@ class Renderer {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 子弹
+    // 子弹（支持角色自定义颜色）
     for (let b of bullets) {
       if (!b.alive) continue;
       const bx = b.x - camX + cx;
       const by = b.y - camY + cy;
       if (bx < -20 || bx > vw + 20 || by < -20 || by > vh + 20) continue;
-      ctx.fillStyle = COLOR_BULLET;
-      ctx.shadowColor = COLOR_BULLET;
-      ctx.shadowBlur = 6;
+      const col = b.color || COLOR_BULLET;
+      const core = b.core || '#ffffff';
+      // 充能弹：较大、更亮
+      const hasCharge = !!b.hasCharge;
+      const size = b.radius + (hasCharge ? 2 : 0);
+      ctx.shadowColor = col;
+      ctx.shadowBlur = hasCharge ? 12 : 8;
+      ctx.fillStyle = col;
       ctx.beginPath();
-      ctx.arc(bx, by, b.radius, 0, Math.PI * 2);
+      ctx.arc(bx, by, size, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
+      // 内核
+      ctx.fillStyle = core;
+      ctx.beginPath();
+      ctx.arc(bx, by, Math.max(1, Math.floor(size * 0.55)), 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // 经验球
@@ -744,27 +756,102 @@ class Renderer {
       ctx.fillStyle = COLOR_DAMAGE_FLASH;
       ctx.fillRect(0, 0, vw, vh);
     }
-    // 外圈
-    ctx.fillStyle = 'rgba(52,152,219,0.2)';
+
+    // 角色主题色（默认蓝色；Echo-01 紫蓝）
+    const themeColor = player.hero && player.hero.color ? player.hero.color : COLOR_PLAYER;
+
+    // 战场反应：低血时红色警示环
+    if (player.fieldReflex && player.fieldReflex.enabled && player.fieldReflex.active) {
+      const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 120);
+      ctx.strokeStyle = 'rgba(231, 76, 60, ' + (0.4 + pulse * 0.3) + ')';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, player.radius + 12, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 战术充能：层叠发光圈
+    if (player.tacticalCharge && player.tacticalCharge.enabled && player.tacticalCharge.stacks > 0) {
+      const stacks = player.tacticalCharge.stacks;
+      for (let i = 0; i < stacks; i++) {
+        const ringR = player.radius + 8 + i * 4;
+        const pulse = 0.55 + 0.45 * Math.sin(performance.now() / (150 + i * 40) + i);
+        ctx.strokeStyle = themeColor;
+        ctx.globalAlpha = 0.25 + pulse * 0.35;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // 外圈（角色主题色）
+    ctx.fillStyle = themeColor + '55';
     ctx.beginPath();
     ctx.arc(cx, cy, player.radius + 6, 0, Math.PI * 2);
     ctx.fill();
-    // 本体
-    ctx.fillStyle = COLOR_PLAYER;
-    ctx.strokeStyle = COLOR_PLAYER_STROKE;
-    ctx.lineWidth = 2;
+
+    // ===== 玩家本体：优先立绘，无立绘则圆形 =====
+    const heroPortrait = player.hero && player.hero.portrait ? player.hero.portrait : null;
+    let portraitDrawn = false;
+    if (heroPortrait) {
+      // portrait 可以是字符串或数组，取第一张
+      const portraitPath = Array.isArray(heroPortrait) ? heroPortrait[0] : heroPortrait;
+      let img = this._portraitCache[portraitPath];
+      if (img && img.complete && img.naturalWidth > 0) {
+        // 已加载完毕，直接绘制（裁剪为圆形）
+        const imgSize = player.radius * 2;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, player.radius, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(img, cx - imgSize / 2, cy - imgSize / 2, imgSize, imgSize);
+        ctx.restore();
+        portraitDrawn = true;
+      } else if (!img) {
+        // 尚未缓存，发起加载，完成后通知重绘
+        img = new Image();
+        img.src = portraitPath;
+        this._portraitCache[portraitPath] = img;
+        img.onload = function () {
+          if (typeof window._requestRedraw === 'function') window._requestRedraw();
+        };
+        img.onerror = function () {
+          delete this._portraitCache[portraitPath];
+        };
+      }
+    }
+
+    if (!portraitDrawn) {
+      // 回退：圆形
+      ctx.fillStyle = themeColor;
+      ctx.strokeStyle = COLOR_PLAYER_STROKE;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, player.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    // 朝向（角色主题色能量枪管，末端白色）
+    ctx.strokeStyle = themeColor;
+    ctx.lineWidth = 4;
+    const gunLen = player.radius + 12;
+    const gx = cx + Math.cos(player.angle) * gunLen;
+    const gy = cy + Math.sin(player.angle) * gunLen;
     ctx.beginPath();
-    ctx.arc(cx, cy, player.radius, 0, Math.PI * 2);
+    ctx.moveTo(cx + Math.cos(player.angle) * (player.radius - 4),
+               cy + Math.sin(player.angle) * (player.radius - 4));
+    ctx.lineTo(gx, gy);
+    ctx.stroke();
+    // 枪口白光
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = themeColor;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(gx, gy, 3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
-    // 朝向
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(player.angle) * (player.radius + 10),
-               cy + Math.sin(player.angle) * (player.radius + 10));
-    ctx.stroke();
+    ctx.shadowBlur = 0;
 
     // 主动技能：闪烁突袭落点预览
     if (typeof getActiveSkillPreview === 'function') {
@@ -983,6 +1070,9 @@ class Renderer {
       ctx.fillStyle = '#fff';
       ctx.font = '20px Arial';
       ctx.fillText('点击重新开始', cx, cy + 30);
+      ctx.fillStyle = '#aaccff';
+      ctx.font = '14px Arial';
+      ctx.fillText('按 ESC 打开暂停菜单可返回主页', cx, cy + 60);
     }
 
     // 镜头闪光叠加层（全屏白闪效果）

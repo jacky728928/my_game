@@ -1,49 +1,24 @@
-/* ===== 基础重置 ===== */
-* { margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent }
-html,body{width:100%;height:100%;overflow:hidden;background:#1a1a2e;touch-action:none;font-family:'Noto Sans SC','Microsoft YaHei',Arial,sans-serif;color:#fff}
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#1a1a2e;touch-action:none}
+#gameCanvas{position:absolute;top:0;left:0;width:100%;height:100%}
 
-/* ===== 主题颜色（来自游戏主页） ===== */
-:root {
-  --bg-dark: #0a0a14;
-  --bg-primary: #12121f;
-  --bg-card: rgba(18,18,31,.85);
-  --accent-gold: #d4af37;
-  --accent-gold-light: #f0d875;
-  --accent-gold-dark: #a08020;
-  --accent-cyan: #00d4ff;
-  --accent-magenta: #ff2d75;
-  --text-primary: #ffffff;
-  --text-secondary: rgba(255,255,255,.6);
-  --text-muted: rgba(255,255,255,.35);
-  --border-glow: rgba(212,175,55,.3);
-  --shadow-gold: 0 0 30px rgba(212,175,55,.2);
-}
-
-/* ===== 游戏画布与输入组件（仅冒险页显示） ===== */
-#gameCanvas{position:absolute;top:0;left:0;width:100%;height:100%;z-index:1}
 #minimap{position:absolute;top:12px;left:12px;width:120px;height:120px;border:2px solid rgba(255,255,255,.5);border-radius:8px;background:rgba(0,0,0,.45);z-index:10}
-@media (max-width:599px) { #minimap{width:90px;height:90px;top:12px;left:12px} }
-
-#wheel{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);width:140px;height:140px;border-radius:50%;border:3px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);z-index:20}
+@media (max-width:599px) {
+  #minimap{width:90px;height:90px;top:12px;left:12px}
+}
+#wheel{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);width:140px;height:140px;border-radius:50%;border:3px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);z-index:20}
+@media (max-width:599px) {
+  #wheel{bottom:65px}
+}
 #wheelKnob{position:absolute;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.45);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
 .hidden{display:none!important}
-
-/* ===== 按页面切换显/隐：非冒险页不渲染游戏元素 ===== */
-body:not([data-page="adventure"]) #gameCanvas,
-body:not([data-page="adventure"]) #minimap,
-body:not([data-page="adventure"]) #wheel,
-body:not([data-page="adventure"]) #pauseBtn{
-  display:none!important
-}
-
-/* 冒险页本身不需要额外内容（除了"冒险"两个字），可以让它透明且不接收点击 */
-#page-adventure{pointer-events:none}
-#page-adventure .page-title{pointer-events:none}
 
 /* ===== 暂停菜单 ===== */
 #pauseBtn{position:fixed;top:12px;right:12px;width:46px;height:46px;border-radius:12px;background:rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.35);color:#fff;font-size:18px;cursor:pointer;z-index:300;display:flex;align-items:center;justify-content:center;padding:0;font-family:Arial,sans-serif;line-height:1}
 #pauseBtn:active{background:rgba(0,0,0,.75);transform:scale(.95)}
-@media (max-width:599px) { #pauseBtn{top:12px;right:12px} }
+@media (max-width:599px) {
+  #pauseBtn{top:12px;right:12px}
+}
 
 #pauseMenu{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:600;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;color:#fff;user-select:none}
 #pauseMenu .pm-title{font-size:32px;font-weight:bold;color:#f1c40f;text-shadow:0 2px 8px rgba(0,0,0,.6);margin-bottom:10px}
@@ -62,113 +37,3 @@ body:not([data-page="adventure"]) #pauseBtn{
 #pauseMenu .pm-map{background:rgba(88,166,255,.15);border-color:#58a6ff;color:#58a6ff}
 #pauseMenu .pm-map:hover{background:rgba(88,166,255,.3)}
 #pauseMenu .pm-hint{margin-top:20px;font-size:11px;color:#777;text-align:center;line-height:1.6}
-
-/* ============================================================ */
-/* ===== 游戏主页（导航栏 + 立绘页）样式（来自 test_project） ===== */
-/* ============================================================ */
-
-/* ===== 背景层（仅在非冒险页显示粒子动态背景） ===== */
-.bg-layer{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;display:none}
-body:not([data-page="adventure"]) .bg-layer{display:block}
-
-.bg-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(212,175,55,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(212,175,55,.03) 1px,transparent 1px);background-size:40px 40px;animation:gridPulse 4s ease-in-out infinite}
-
-@keyframes gridPulse{0%,100%{opacity:.5}50%{opacity:1}}
-
-.bg-glow{position:absolute;border-radius:50%;filter:blur(100px);opacity:.4;animation:floatGlow 8s ease-in-out infinite}
-.bg-glow-1{width:400px;height:400px;background:radial-gradient(circle,var(--accent-gold) 0%,transparent 70%);top:-100px;right:-100px;animation-delay:0s}
-.bg-glow-2{width:300px;height:300px;background:radial-gradient(circle,var(--accent-cyan) 0%,transparent 70%);bottom:-50px;left:-50px;animation-delay:-4s}
-
-@keyframes floatGlow{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(20px,-20px) scale(1.1)}}
-
-.bg-particles{position:absolute;inset:0;pointer-events:none}
-.particle{position:absolute;width:2px;height:2px;background:var(--accent-gold);border-radius:50%;opacity:0;animation:particleFloat 6s ease-in-out infinite}
-
-@keyframes particleFloat{0%{opacity:0;transform:translateY(100vh) scale(0)}20%{opacity:.6}80%{opacity:.6}100%{opacity:0;transform:translateY(-100px) scale(1)}}
-
-/* ===== 主容器 ===== */
-#app{width:100%;height:100%;display:flex;flex-direction:column;position:relative;z-index:1}
-
-/* ===== 页面内容区域 ===== */
-#page-container{flex:1;position:relative;overflow:hidden}
-
-/* ===== 页面样式 ===== */
-.page{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;padding-bottom:100px;opacity:0;visibility:hidden;transform:scale(.95);transition:all .4s cubic-bezier(.4,0,.2,1)}
-.page.active{opacity:1;visibility:visible;transform:scale(1)}
-.page-title{margin-top:24px;font-family:'Ma Shan Zheng','Microsoft YaHei',cursive;font-size:28px;color:var(--accent-gold);text-shadow:0 0 20px rgba(212,175,55,.5);letter-spacing:8px;opacity:0;transform:translateY(20px);transition:all .4s cubic-bezier(.4,0,.2,1) .1s}
-.page.active .page-title{opacity:1;transform:translateY(0)}
-
-/* ===== 立绘区域 ===== */
-.portrait-frame{position:relative;width:min(75vw,320px,calc((100vh - 200px) * .75));aspect-ratio:3/4;max-height:calc(100vh - 200px)}
-.portrait-glow{position:absolute;inset:-20px;background:radial-gradient(ellipse at center,rgba(212,175,55,.15) 0%,transparent 70%);animation:portraitGlow 3s ease-in-out infinite}
-
-@keyframes portraitGlow{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.05)}}
-
-.portrait-inner{position:relative;width:100%;height:100%;background:linear-gradient(145deg,rgba(255,255,255,.08) 0%,rgba(255,255,255,.02) 100%);border:2px solid var(--border-glow);border-radius:16px;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:var(--shadow-gold),inset 0 0 60px rgba(212,175,55,.05)}
-.portrait-inner::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 0%,rgba(212,175,55,.03) 100%);pointer-events:none}
-.portrait-img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;transform-origin:center center;animation:portraitSway 5s ease-in-out infinite,portraitFloat 4s ease-in-out infinite;transition:opacity .3s ease}
-
-@keyframes portraitSway{0%,100%{transform:translateX(-3px) rotate(-1deg)}50%{transform:translateX(3px) rotate(1deg)}}
-@keyframes portraitFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-
-/* 切换按钮 */
-.portrait-switch{margin-top:16px;padding:10px 24px;background:rgba(212,175,55,.15);border:1px solid var(--accent-gold);color:var(--accent-gold);font-family:'Noto Sans SC','Microsoft YaHei',sans-serif;font-size:14px;border-radius:8px;cursor:pointer;transition:all .25s ease;backdrop-filter:blur(6px);z-index:400}
-.portrait-switch:hover{background:rgba(212,175,55,.3);transform:translateY(-2px)}
-.portrait-switch:active{transform:translateY(0) scale(.98)}
-
-/* 装饰角落 */
-.portrait-corner{position:absolute;width:24px;height:24px;border:2px solid var(--accent-gold)}
-.portrait-corner.tl{top:-4px;left:-4px;border-right:none;border-bottom:none;border-radius:4px 0 0 0}
-.portrait-corner.tr{top:-4px;right:-4px;border-left:none;border-bottom:none;border-radius:0 4px 0 0}
-.portrait-corner.bl{bottom:-4px;left:-4px;border-right:none;border-top:none;border-radius:0 0 0 4px}
-.portrait-corner.br{bottom:-4px;right:-4px;border-left:none;border-top:none;border-radius:0 0 4px 0}
-
-/* ===== 开发中页面（主角/科技树/商店） ===== */
-.dev-frame{position:relative;padding:60px 80px}
-.dev-inner{display:flex;flex-direction:column;align-items:center;gap:16px;animation:devFloat 3s ease-in-out infinite}
-
-@keyframes devFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-
-.dev-icon{width:80px;height:80px;color:var(--text-muted);opacity:.5}
-.dev-icon svg{width:100%;height:100%}
-.dev-text{font-family:'Ma Shan Zheng','Microsoft YaHei',cursive;font-size:36px;color:var(--text-secondary);letter-spacing:8px}
-.dev-sub{font-size:14px;color:var(--text-muted);letter-spacing:4px}
-
-/* ===== 底部导航栏 ===== */
-#bottom-nav{position:fixed;bottom:0;left:0;right:0;height:85px;background:linear-gradient(180deg,transparent 0%,var(--bg-dark) 20%);padding:0 16px 16px;display:flex;align-items:flex-end;justify-content:center;gap:8px;z-index:100}
-.nav-btn{position:relative;flex:1;max-width:90px;height:70px;background:var(--bg-card);border:1px solid rgba(255,255,255,.1);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;transition:all .3s cubic-bezier(.4,0,.2,1);backdrop-filter:blur(10px);overflow:hidden}
-.nav-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(212,175,55,.1) 0%,transparent 50%);opacity:0;transition:opacity .3s ease}
-.nav-btn:hover{transform:translateY(-4px);border-color:rgba(212,175,55,.3)}
-.nav-btn:active{transform:translateY(-2px) scale(.98)}
-.nav-btn.active{background:linear-gradient(180deg,rgba(212,175,55,.2) 0%,rgba(212,175,55,.05) 100%);border-color:var(--accent-gold);box-shadow:0 0 20px rgba(212,175,55,.3),inset 0 0 20px rgba(212,175,55,.1)}
-.nav-btn.active::before{opacity:1}
-.nav-icon-wrap{width:28px;height:28px;color:var(--text-secondary);transition:all .3s ease}
-.nav-icon-wrap svg{width:100%;height:100%}
-.nav-btn.active .nav-icon-wrap{color:var(--accent-gold);filter:drop-shadow(0 0 8px rgba(212,175,55,.5))}
-.nav-label{font-size:12px;font-weight:500;color:var(--text-muted);transition:all .3s ease;letter-spacing:1px}
-.nav-btn.active .nav-label{color:var(--accent-gold);font-weight:700}
-.nav-indicator{position:absolute;bottom:6px;width:20px;height:3px;background:var(--accent-gold);border-radius:2px;opacity:0;transform:scaleX(0);transition:all .3s cubic-bezier(.4,0,.2,1)}
-.nav-btn.active .nav-indicator{opacity:1;transform:scaleX(1)}
-
-/* ===== 响应式适配 ===== */
-@media (max-width:375px) {
-  .portrait-frame{width:70vw}
-  .nav-btn{height:62px;max-width:80px}
-  .nav-icon-wrap{width:24px;height:24px}
-  .nav-label{font-size:11px}
-  #bottom-nav{height:78px}
-}
-@media (min-width:768px) {
-  .portrait-frame{width:min(50vw,400px,calc((100vh - 220px) * .75))}
-  .nav-btn{max-width:110px;height:76px}
-  .nav-icon-wrap{width:32px;height:32px}
-  .nav-label{font-size:14px}
-  .page-title{font-size:32px}
-}
-
-/* ===== 页面切换动画 ===== */
-.page-enter{opacity:0;transform:translateX(30px)}
-.page-exit{opacity:0;transform:translateX(-30px)}
-
-/* ===== 游戏画布区域（冒险页使用） ===== */
-.game-surface{position:absolute;inset:0;width:100%;height:100%}

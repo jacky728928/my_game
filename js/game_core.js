@@ -1,4 +1,5 @@
 // ========== 游戏核心模块 ==========
+// 不再在文件加载时自动 init 和 startLoop，由主页点击"开始游戏"触发
 let player, input, minimap, renderer;
 let enemies = [];
 let bullets = [];
@@ -14,6 +15,9 @@ let spawnInterval = SPAWN_INTERVAL_INIT;
 let gameTime = 0;
 let elapsedTime = 0;
 window._killCount = 0;
+window._spawnRateMultiplier = 1;
+// 立绘加载完成后触发一次渲染（由 renderer.js 中的 Image onload 调用）
+window._requestRedraw = function () {};
 let gameOver = false;
 let gamePaused = false;
 let levelUpChoices = null;
@@ -21,9 +25,10 @@ let levelUpUi = null;
 let screenShake = { intensity: 0, duration: 0, elapsed: 0 };
 let cameraFlash = { intensity: 0, duration: 0, elapsed: 0 };
 let _activeSkillCharging = false;
-window._spawnRateMultiplier = 1;
+let _rafId = null; // 用于停止游戏循环
 
 function init() {
+  if (window.LOG) window.LOG('game_core: init() 开始，WORLD=' + WORLD_W + '×' + WORLD_H + ' walls=' + (walls ? walls.length : 'N/A'));
   player = new Player();
   input = new InputHandler();
   minimap = new Minimap();
@@ -50,6 +55,7 @@ function init() {
     player.x = window._pendingPlayerSpawn.x;
     player.y = window._pendingPlayerSpawn.y;
     window._pendingPlayerSpawn = null;
+    if (window.LOG) window.LOG('game_core: 应用地图出生点 (' + player.x + ', ' + player.y + ')');
   }
 
   // 检查玩家是否在墙体内，若在则向外移动
@@ -151,13 +157,13 @@ function addDamageNumber(x, y, value, isCrit) {
 function update(dt) {
   if (!player.alive) return;
   if (gamePaused) return;
-  if (window._currentPage && window._currentPage !== 'adventure') return;
 
   elapsedTime += dt;
   const [ix, iy] = input.getDirection();
   player.setVelocity(ix * player.speed, iy * player.speed);
   player.update(dt, bullets);
   attack();
+  updateBurst(dt);
   updateSecondaryWeapons(dt);
 
   for (let b of bullets) {
@@ -251,11 +257,59 @@ function gameLoop() {
   minimap.render(player, enemies, player.x, player.y);
   _updateSkillIconVisual();
 
-  requestAnimationFrame(gameLoop);
+  _rafId = requestAnimationFrame(gameLoop);
+}
+
+function startLoop() {
+  // 重置时间基准，避免长期暂停后的大 dt
+  gameLoop._last = null;
+  if (_rafId) cancelAnimationFrame(_rafId);
+  _rafId = requestAnimationFrame(gameLoop);
+  if (window.LOG) window.LOG('game_core: startLoop() 完成，游戏循环已启动');
+}
+
+function stopLoop() {
+  if (_rafId) {
+    cancelAnimationFrame(_rafId);
+    _rafId = null;
+  }
+  gameLoop._last = null;
+  if (window.LOG) window.LOG('game_core: stopLoop() — 游戏循环已停止');
 }
 
 function restart() {
+  if (window.LOG) window.LOG('game_core: restart() — 重新开始游戏');
   init();
+  startLoop();
+}
+
+// 从游戏中返回主页
+function returnToHomepage() {
+  if (window.LOG) window.LOG('game_core: returnToHomepage() — 返回主页');
+  stopLoop();
+  closeLevelUpUi();
+  closePauseMenu();
+  // 隐藏游戏 UI 元素（不删除 DOM，避免再次 init 时找不到）
+  const dev = document.getElementById('devPanel');
+  if (dev) dev.classList.add('hidden');
+  const skill = document.getElementById('activeSkillIcon');
+  if (skill) skill.style.display = 'none';
+  const pauseBtn = document.getElementById('pauseBtn');
+  if (pauseBtn) pauseBtn.classList.add('hidden');
+  const wheel = document.getElementById('wheel');
+  if (wheel) wheel.classList.add('hidden');
+  // 清理地图选择相关
+  const mapSel = document.getElementById('mapSelectMenu');
+  if (mapSel && mapSel.parentNode) mapSel.parentNode.removeChild(mapSel);
+  const mapSel2 = document.getElementById('mapSelectionModal');
+  if (mapSel2 && mapSel2.parentNode) mapSel2.parentNode.removeChild(mapSel2);
+
+  // 显示主页
+  if (window.Homepage && typeof window.Homepage.show === 'function') {
+    window.Homepage.show();
+  } else {
+    location.reload();
+  }
 }
 
 document.addEventListener('click', (e) => {
@@ -272,5 +326,12 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-init();
-requestAnimationFrame(gameLoop);
+// ========== 暴露 GameCore 命名空间 ==========
+// 由主页 "开始游戏" 按钮调用，不再在文件加载时自动启动
+window.GameCore = {
+  init: init,
+  startLoop: startLoop,
+  stopLoop: stopLoop,
+  restart: restart,
+  returnToHomepage: returnToHomepage,
+};

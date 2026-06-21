@@ -2,6 +2,15 @@
 class InputHandler {
   constructor() {
     this.el = document.getElementById('wheel');
+    if (!this.el) {
+      this.el = document.createElement('div');
+      this.el.id = 'wheel';
+      this.el.className = 'hidden';
+      const knob = document.createElement('div');
+      knob.id = 'wheelKnob';
+      this.el.appendChild(knob);
+      document.body.appendChild(this.el);
+    }
     this.knob = document.getElementById('wheelKnob');
     this.cx = 0;  // 轮盘屏幕中心
     this.cy = 0;
